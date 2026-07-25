@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>財務規劃簿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F2EDE1;
+    --line:#CBBFA0;
+    --line-soft:#DAD0B8;
+    --ink:#2B2A28;
+    --ink-soft:#6B6355;
+    --seal:#A6321E;
+    --seal-soft:#c25a45;
+    --green:#3F6B4A;
+    --gold:#9c7b30;
+    --shadow: 0 18px 40px rgba(43,42,40,0.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(ellipse at top, #EFE8D6, #DDD2B4 120%);
+    min-height:100vh;
+    font-family:'Noto Sans TC', sans-serif;
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+    padding:40px 14px 80px;
+  }
+  .book{ width:100%; max-width:760px; }
+
+  .cover{
+    background: linear-gradient(180deg, #4a3527, #33241a);
+    border-radius:6px 6px 0 0;
+    padding:32px 30px 24px;
+    color:#EFE3C8;
+    box-shadow: var(--shadow);
+    position:relative;
+    overflow:hidden;
+  }
+  .cover::before{ content:""; position:absolute; inset:8px; border:1px solid rgba(239,227,200,0.35); pointer-events:none; }
+  .cover .eyebrow{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.28em; color:#C9A85C; text-transform:uppercase; }
+  .cover h1{ font-family:'Noto Serif TC', serif; font-weight:900; font-size:clamp(26px,5.5vw,38px); margin:8px 0 4px; letter-spacing:0.06em; }
+  .cover .sub{ font-size:13px; color:#cbb98a; }
+
+  .tabs{ display:flex; background:#3a2a1e; }
+  .tab{
+    flex:1; text-align:center; padding:13px 8px;
+    font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px;
+    color:#c9b78a; cursor:pointer; border-bottom:3px solid transparent;
+    transition:all .25s ease; letter-spacing:0.03em;
+  }
+  .tab.active{ color:#F2EDE1; background:linear-gradient(180deg, rgba(255,255,255,0.04), transparent); border-bottom:3px solid var(--seal); }
+
+  .page{
+    background: var(--paper);
+    padding:30px 28px 40px;
+    box-shadow: var(--shadow);
+    border-radius:0 0 6px 6px;
+    min-height:400px;
+  }
+
+  .view{ display:none; }
+  .view.active{ display:block; animation: fadeIn .4s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ---- Overview ---- */
+  .balance-hero{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:20px 22px; border:2px solid var(--ink); border-radius:4px;
+    position:relative; margin-bottom:22px; background:rgba(255,255,255,0.25);
+  }
+  .balance-hero .label{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px; color:var(--ink-soft); }
+  .balance-hero .value{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:32px; margin-top:4px; }
+  .stamp{ width:76px; height:76px; transform:rotate(-9deg); opacity:0.9; flex-shrink:0; }
+  .stamp svg{ width:100%; height:100%; display:block; }
+
+  .stat-row{ display:flex; gap:14px; margin-bottom:24px; }
+  .stat-card{ flex:1; padding:14px 16px; background:rgba(255,255,255,0.35); border:1px solid var(--line-soft); border-radius:4px; }
+  .stat-card .k{ font-size:11px; color:var(--ink-soft); font-family:'JetBrains Mono',monospace; letter-spacing:0.04em; }
+  .stat-card .v{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:20px; margin-top:4px; }
+  .stat-card.in .v{ color:var(--green); }
+  .stat-card.out .v{ color:var(--seal); }
+
+  .section-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:14px; margin:22px 0 10px; color:var(--ink); border-bottom:1px solid var(--line); padding-bottom:6px; }
+
+  .cat-row{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:13px; }
+  .cat-row .cat-name{ width:110px; flex-shrink:0; color:var(--ink-soft); }
+  .cat-bar-track{ flex:1; height:10px; background:rgba(107,99,85,0.13); border-radius:5px; overflow:hidden; }
+  .cat-bar-fill{ height:100%; border-radius:5px; }
+  .cat-amt{ width:80px; text-align:right; font-family:'JetBrains Mono',monospace; flex-shrink:0; }
+
+  /* ---- Transactions ---- */
+  .add-form{
+    display:grid; grid-template-columns: auto 1fr 1fr auto; gap:8px; align-items:center;
+    background:rgba(255,255,255,0.4); border:1px solid var(--line-soft); border-radius:4px; padding:14px; margin-bottom:20px;
+  }
+  .add-form select, .add-form input{
+    font-family:'Noto Sans TC',sans-serif; font-size:13.5px; padding:9px 10px;
+    border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink);
+  }
+  .add-form button{
+    background:var(--seal); color:#fff; border:none; border-radius:3px; padding:9px 16px;
+    font-family:'Noto Serif TC',serif; font-weight:700; cursor:pointer; font-size:13.5px;
+    transition:background .2s;
+  }
+  .add-form button:hover{ background:#8a2a19; }
+
+  .txn-list{ display:flex; flex-direction:column; }
+  .txn-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:11px 4px; border-bottom:1px solid var(--line-soft);
+    font-size:14px;
+  }
+  .txn-left{ display:flex; align-items:center; gap:10px; }
+  .txn-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .txn-name{ color:var(--ink); }
+  .txn-note{ color:var(--ink-soft); font-size:12px; margin-left:6px; }
+  .txn-right{ display:flex; align-items:center; gap:14px; }
+  .txn-amt{ font-family:'JetBrains Mono',monospace; font-weight:500; }
+  .txn-amt.in{ color:var(--green); }
+  .txn-amt.out{ color:var(--seal); }
+  .txn-amt.in::before{ content:"+ "; }
+  .txn-amt.out::before{ content:"− "; }
+  .txn-del{
+    background:none; border:none; color:var(--ink-soft); cursor:pointer;
+    font-size:16px; line-height:1; padding:2px 4px; opacity:0.5; transition:opacity .2s;
+  }
+  .txn-del:hover{ opacity:1; color:var(--seal); }
+
+  .empty-note{ color:var(--ink-soft); font-size:13px; padding:18px 4px; text-align:center; }
+
+  /* ---- Scenario ---- */
+  .scn-intro{ font-size:13px; color:var(--ink-soft); margin-bottom:16px; line-height:1.7; }
+  .scn-check-row{
+    display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--line-soft); font-size:13.5px;
+  }
+  .scn-check-row input[type=checkbox]{ width:16px; height:16px; accent-color:var(--seal); flex-shrink:0; }
+  .scn-check-row .nm{ flex:1; }
+  .scn-check-row .am{ font-family:'JetBrains Mono',monospace; color:var(--seal); }
+
+  .scn-add-list{ margin-top:6px; }
+  .scn-item-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 4px; border-bottom:1px solid var(--line-soft); font-size:13.5px;
+  }
+  .scn-item-row .nm{ color:var(--ink); }
+  .scn-item-row .am{ font-family:'JetBrains Mono',monospace; color:var(--seal); margin-right:10px; }
+
+  .scn-add-form{
+    display:grid; grid-template-columns: 1.4fr 1fr auto; gap:8px; margin:14px 0 22px;
+  }
+  .scn-add-form input{
+    font-family:'Noto Sans TC',sans-serif; font-size:13.5px; padding:9px 10px;
+    border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink);
+  }
+  .scn-add-form button{
+    background:var(--ink); color:#F2EDE1; border:none; border-radius:3px; padding:9px 14px;
+    font-family:'Noto Serif TC',serif; font-weight:700; cursor:pointer; font-size:13.5px;
+  }
+
+  /* ---- Planning (monthly goals / achievement / review) ---- */
+  .goal-form{
+    display:flex; flex-wrap:wrap; gap:14px; align-items:end;
+    background:rgba(255,255,255,0.4); border:1px solid var(--line-soft); border-radius:4px; padding:14px; margin-bottom:20px;
+  }
+  .goal-form label{ display:flex; flex-direction:column; font-size:12px; color:var(--ink-soft); gap:5px; flex:1; min-width:140px; }
+  .goal-form input{
+    font-family:'JetBrains Mono',monospace; font-size:13.5px; padding:9px 10px;
+    border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink);
+  }
+  .goal-form button{
+    background:var(--seal); color:#fff; border:none; border-radius:3px; padding:10px 16px;
+    font-family:'Noto Serif TC',serif; font-weight:700; cursor:pointer; font-size:13.5px;
+  }
+
+  .achieve-card{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:14px 16px; background:rgba(255,255,255,0.35); border:1px solid var(--line-soft); border-radius:4px; margin-bottom:10px;
+  }
+  .achieve-card .nm{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:13.5px; color:var(--ink); }
+  .achieve-card .detail{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft); margin-top:3px; }
+  .badge{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:12px; padding:5px 12px; border-radius:20px; flex-shrink:0; white-space:nowrap; }
+  .badge.ok{ background:rgba(63,107,74,0.15); color:var(--green); }
+  .badge.no{ background:rgba(166,50,30,0.15); color:var(--seal); }
+  .badge.na{ background:rgba(107,99,85,0.13); color:var(--ink-soft); }
+
+  .budget-row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--line-soft); font-size:13px; }
+  .budget-row .cat-name{ width:88px; flex-shrink:0; color:var(--ink-soft); }
+  .budget-row .cat-bar-track{ flex:1; min-width:50px; height:10px; background:rgba(107,99,85,0.13); border-radius:5px; overflow:hidden; }
+  .budget-row .cat-bar-fill{ height:100%; border-radius:5px; }
+  .budget-row input{
+    width:66px; font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:6px 7px;
+    border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); flex-shrink:0;
+  }
+  .budget-row input.plan-actual{ border-color:var(--seal-soft); }
+  .plan-legend{ display:flex; gap:16px; font-size:11.5px; color:var(--ink-soft); margin-bottom:8px; }
+  .plan-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .plan-legend .dot{ width:8px; height:8px; border-radius:2px; display:inline-block; border:1px solid var(--line); }
+  .plan-legend .dot.actual{ border-color:var(--seal-soft); }
+
+  .review-form{
+    display:flex; flex-direction:column; gap:8px;
+    background:rgba(255,255,255,0.4); border:1px solid var(--line-soft); border-radius:4px; padding:14px; margin-bottom:16px;
+  }
+  .review-form input[type=month]{
+    font-family:'JetBrains Mono',monospace; font-size:13px; padding:8px 10px;
+    border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); align-self:flex-start;
+  }
+  .review-form textarea{
+    font-family:'Noto Sans TC',sans-serif; font-size:13.5px; padding:10px;
+    border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--ink); resize:vertical;
+  }
+  .review-form button{
+    align-self:flex-end; background:var(--ink); color:#F2EDE1; border:none; border-radius:3px; padding:9px 16px;
+    font-family:'Noto Serif TC',serif; font-weight:700; cursor:pointer; font-size:13.5px;
+  }
+  .review-item{ padding:12px 4px; border-bottom:1px solid var(--line-soft); }
+  .review-item .rm{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .review-item .month{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px; color:var(--seal); }
+  .review-item .txt{ font-size:13px; color:var(--ink); line-height:1.6; white-space:pre-wrap; }
+
+  .footnote{ text-align:center; font-size:11px; color:var(--ink-soft); margin-top:26px; font-family:'JetBrains Mono',monospace; letter-spacing:0.04em; }
+
+  @media (max-width:520px){
+    .add-form{ grid-template-columns: 1fr 1fr; }
+    .add-form button{ grid-column: span 2; }
+    .scn-add-form{ grid-template-columns: 1fr; }
+    .balance-hero .value{ font-size:24px; }
+    .stamp{ width:56px; height:56px; }
+    .tab{ font-size:12px; padding:11px 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="book">
+  <div class="cover">
+    <div class="eyebrow">FINANCE PLANNER · 財務規劃</div>
+    <h1>財務規劃簿</h1>
+    <div class="sub">記帳 · 總覽 · 情境試算 · 月度規劃，一站管理</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-target="overview">總覽</div>
+    <div class="tab" data-target="transactions">記帳</div>
+    <div class="tab" data-target="scenario">情境規劃</div>
+    <div class="tab" data-target="planning">月度規劃</div>
+  </div>
+
+  <div class="page">
+
+    <!-- OVERVIEW -->
+    <div class="view active" id="overview">
+      <div class="balance-hero">
+        <div>
+          <div class="label">本月結餘</div>
+          <div class="value" id="ov-balance">$0</div>
+        </div>
+        <div class="stamp">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="44" fill="none" stroke="#A6321E" stroke-width="4"/>
+            <circle cx="50" cy="50" r="36" fill="none" stroke="#A6321E" stroke-width="1.5"/>
+            <text x="50" y="45" text-anchor="middle" font-family="'Noto Serif TC',serif" font-weight="900" font-size="20" fill="#A6321E">結</text>
+            <text x="50" y="72" text-anchor="middle" font-family="'Noto Serif TC',serif" font-weight="900" font-size="20" fill="#A6321E">餘</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card in"><div class="k">總收入</div><div class="v" id="ov-income">$0</div></div>
+        <div class="stat-card out"><div class="k">總支出</div><div class="v" id="ov-expense">$0</div></div>
+        <div class="stat-card"><div class="k">儲蓄率</div><div class="v" id="ov-rate">0%</div></div>
+      </div>
+
+      <div class="section-title">支出分類</div>
+      <div id="ov-categories"></div>
+      <div class="footnote" id="ov-empty" style="display:none;">尚未有任何記錄，前往「記帳」新增第一筆吧</div>
+    </div>
+
+    <!-- TRANSACTIONS -->
+    <div class="view" id="transactions">
+      <div class="add-form">
+        <select id="tx-type">
+          <option value="income">收入</option>
+          <option value="expense" selected>支出</option>
+        </select>
+        <input id="tx-name" type="text" placeholder="項目名稱（如：飲食）">
+        <input id="tx-amount" type="number" placeholder="金額" min="0">
+        <button id="tx-add">新增</button>
+      </div>
+      <div class="section-title">收入</div>
+      <div class="txn-list" id="list-income"></div>
+      <div class="section-title">支出</div>
+      <div class="txn-list" id="list-expense"></div>
+    </div>
+
+    <!-- SCENARIO -->
+    <div class="view" id="scenario">
+      <div class="scn-intro">試算「如果」的情況：取消勾選代表這筆支出在情境中不會發生，也可以新增假設性的額外支出（例如搬出去住的房租），看看調整後每月還能剩多少。</div>
+
+      <div class="section-title">目前支出項目</div>
+      <div id="scn-existing"></div>
+
+      <div class="section-title">假設新增支出</div>
+      <div class="scn-add-list" id="scn-added"></div>
+      <div class="scn-add-form">
+        <input id="scn-name" type="text" placeholder="項目名稱（如：每月房租）">
+        <input id="scn-amount" type="number" placeholder="金額" min="0">
+        <button id="scn-add-btn">新增假設項目</button>
+      </div>
+
+      <div class="balance-hero">
+        <div>
+          <div class="label">情境試算後結餘</div>
+          <div class="value" id="scn-balance">$0</div>
+        </div>
+        <div class="stamp">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="44" fill="none" stroke="#A6321E" stroke-width="4"/>
+            <circle cx="50" cy="50" r="36" fill="none" stroke="#A6321E" stroke-width="1.5"/>
+            <text x="50" y="45" text-anchor="middle" font-family="'Noto Serif TC',serif" font-weight="900" font-size="20" fill="#A6321E">試</text>
+            <text x="50" y="72" text-anchor="middle" font-family="'Noto Serif TC',serif" font-weight="900" font-size="20" fill="#A6321E">算</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLANNING -->
+    <div class="view" id="planning">
+      <div class="scn-intro">設定本月的儲蓄與支出目標，並在下方分類項目中實際填入這個月花了多少，達成與否由系統自動用「實際 ≤ 目標」判斷，而不是手動打勾。</div>
+
+      <div class="section-title">本月目標設定</div>
+      <div class="goal-form">
+        <label>儲蓄目標
+          <input id="goal-savings" type="number" min="0" placeholder="例如 15000">
+        </label>
+        <label>支出上限
+          <input id="goal-expense-cap" type="number" min="0" placeholder="例如 45000">
+        </label>
+        <button id="goal-save">儲存目標</button>
+      </div>
+
+      <div class="section-title">達成狀況</div>
+      <div id="plan-achieve"></div>
+
+      <div class="section-title">分類：目標 vs 實際</div>
+      <div class="plan-legend"><span><i class="dot"></i>目標金額</span><span><i class="dot actual"></i>實際花費</span></div>
+      <div id="plan-cat-budget"></div>
+
+      <div class="section-title">每月檢討</div>
+      <div class="review-form">
+        <input id="review-month" type="month">
+        <textarea id="review-text" rows="3" placeholder="這個月的心得、哪裡超支、下個月要調整什麼..."></textarea>
+        <button id="review-add">新增檢討</button>
+      </div>
+      <div id="review-list"></div>
+    </div>
+
+  </div>
+  <div class="footnote">資料儲存在你的裝置帳號中，重新整理不會消失</div>
+</div>
+
+<script>
+(function(){
+  const CATEGORY_COLORS = ['#A6321E','#9c7b30','#6B6355','#c25a45','#3F6B4A','#5a4a2e','#7a3b2a'];
+
+  const DEFAULT_TXNS = [
+    {id:'d1', type:'income', name:'薪水', amount:54000},
+    {id:'d2', type:'income', name:'薪水（掃地）', amount:2000},
+    {id:'d3', type:'income', name:'薪資（需要找案子）', amount:0},
+    {id:'d4', type:'expense', name:'飲食', amount:16000},
+    {id:'d5', type:'expense', name:'家用費', amount:11000},
+    {id:'d6', type:'expense', name:'電話費', amount:500},
+    {id:'d7', type:'expense', name:'機車加油費', amount:600},
+    {id:'d8', type:'expense', name:'skool 費用', amount:288},
+    {id:'d9', type:'expense', name:'AI 費用', amount:1000},
+    {id:'d10', type:'expense', name:'慈善捐款', amount:500},
+    {id:'d11', type:'expense', name:'iCloud', amount:90},
+    {id:'d12', type:'expense', name:'Google 雲端', amount:65},
+    {id:'d13', type:'expense', name:'skool 遊牧民族', amount:323},
+    {id:'d14', type:'expense', name:'貸款', amount:15000},
+  ];
+  const DEFAULT_SCENARIO_EXCLUDED = ['d5']; // 家用費 excluded by default in scenario (moving out)
+  const DEFAULT_SCENARIO_ADDED = [
+    {id:'s1', name:'每月房租', amount:10000},
+    {id:'s2', name:'每月定期定額', amount:5000},
+  ];
+
+  let txns = [];
+  let scnExcluded = new Set();
+  let scnAdded = [];
+  let planGoals = {savings:0, expenseCap:0};
+  let categoryBudgets = {};
+  let categoryActuals = {};
+  let reviews = [];
+
+  const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
+
+  // ---------- storage helpers (with graceful in-memory fallback) ----------
+  // Items that should exist even for people who already had saved data
+  // before these were added to the defaults. Adding a name here ensures
+  // it gets merged in once, without duplicating on every load.
+  const ENSURE_ITEMS = [
+    {type:'expense', name:'iCloud', amount:90},
+    {type:'expense', name:'Google 雲端', amount:65},
+    {type:'expense', name:'skool 遊牧民族', amount:323},
+    {type:'expense', name:'貸款', amount:15000},
+  ];
+
+  async function loadState(){
+    let hadSaved = false;
+    try{
+      const r = await window.storage.get('finance:state');
+      if(r && r.value){
+        const parsed = JSON.parse(r.value);
+        txns = parsed.txns || DEFAULT_TXNS;
+        scnExcluded = new Set(parsed.scnExcluded || DEFAULT_SCENARIO_EXCLUDED);
+        scnAdded = parsed.scnAdded || DEFAULT_SCENARIO_ADDED;
+        planGoals = parsed.planGoals || {savings:0, expenseCap:0};
+        categoryBudgets = parsed.categoryBudgets || {};
+        categoryActuals = parsed.categoryActuals || {};
+        reviews = parsed.reviews || [];
+        hadSaved = true;
+      }
+    }catch(e){ /* no saved state yet */ }
+    if(!hadSaved){
+      txns = DEFAULT_TXNS.slice();
+      scnExcluded = new Set(DEFAULT_SCENARIO_EXCLUDED);
+      scnAdded = DEFAULT_SCENARIO_ADDED.slice();
+      planGoals = {savings:0, expenseCap:0};
+      categoryBudgets = {};
+      categoryActuals = {};
+      reviews = [];
+      saveState();
+      return;
+    }
+    // Merge in any ensure-items that aren't already present by name, so
+    // updates to the default list still reach people with existing data.
+    let changed = false;
+    ENSURE_ITEMS.forEach(item=>{
+      const exists = txns.some(t => t.name === item.name);
+      if(!exists){
+        txns.push({id: uid(), type:item.type, name:item.name, amount:item.amount});
+        changed = true;
+      }
+    });
+    // One-time correction: 飲食 amount updated from 15000 to 16000
+    const food = txns.find(t => t.name === '飲食' && Number(t.amount) === 15000);
+    if(food){ food.amount = 16000; changed = true; }
+    if(changed) saveState();
+  }
+  async function saveState(){
+    const payload = JSON.stringify({
+      txns, scnExcluded: Array.from(scnExcluded), scnAdded,
+      planGoals, categoryBudgets, categoryActuals, reviews
+    });
+    try{ await window.storage.set('finance:state', payload); }catch(e){ /* storage unavailable, continue in-memory */ }
+  }
+
+  function uid(){ return 'x' + Math.random().toString(36).slice(2,9); }
+  function currentMonthStr(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+
+  // ---------- render: overview ----------
+  function renderOverview(){
+    const income = txns.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
+    const expense = txns.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
+    const balance = income - expense;
+    document.getElementById('ov-balance').textContent = fmt(balance);
+    document.getElementById('ov-income').textContent = fmt(income);
+    document.getElementById('ov-expense').textContent = fmt(expense);
+    document.getElementById('ov-rate').textContent = income>0 ? Math.round((balance/income)*100)+'%' : '0%';
+
+    const catWrap = document.getElementById('ov-categories');
+    const expenses = txns.filter(t=>t.type==='expense').sort((a,b)=>b.amount-a.amount);
+    document.getElementById('ov-empty').style.display = txns.length===0 ? 'block':'none';
+    if(expenses.length===0){
+      catWrap.innerHTML = '<div class="empty-note">尚未有支出記錄</div>';
+      return;
+    }
+    const max = Math.max(...expenses.map(e=>e.amount), 1);
+    catWrap.innerHTML = expenses.map((e,i)=>{
+      const color = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
+      const width = Math.max(4, Math.round((e.amount/max)*100));
+      return `<div class="cat-row">
+        <div class="cat-name">${escapeHtml(e.name)}</div>
+        <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${width}%; background:${color};"></div></div>
+        <div class="cat-amt">${fmt(e.amount)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ---------- render: transactions ----------
+  function renderTxnList(type, elId){
+    const el = document.getElementById(elId);
+    const items = txns.filter(t=>t.type===type);
+    if(items.length===0){ el.innerHTML = '<div class="empty-note">尚無資料</div>'; return; }
+    el.innerHTML = items.map((t,i)=>{
+      const color = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
+      return `<div class="txn-row">
+        <div class="txn-left">
+          <div class="txn-dot" style="background:${color};"></div>
+          <div class="txn-name">${escapeHtml(t.name)}</div>
+        </div>
+        <div class="txn-right">
+          <div class="txn-amt ${type==='income'?'in':'out'}">${fmt(t.amount)}</div>
+          <button class="txn-del" data-id="${t.id}" title="刪除">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.txn-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        txns = txns.filter(t=>t.id!==btn.dataset.id);
+        scnExcluded.delete(btn.dataset.id);
+        saveState(); renderAll();
+      });
+    });
+  }
+
+  // ---------- render: scenario ----------
+  function renderScenario(){
+    const expenses = txns.filter(t=>t.type==='expense');
+    const existWrap = document.getElementById('scn-existing');
+    if(expenses.length===0){
+      existWrap.innerHTML = '<div class="empty-note">尚無支出項目</div>';
+    } else {
+      existWrap.innerHTML = expenses.map(e=>{
+        const checked = !scnExcluded.has(e.id) ? 'checked' : '';
+        return `<div class="scn-check-row">
+          <input type="checkbox" data-id="${e.id}" ${checked}>
+          <div class="nm">${escapeHtml(e.name)}</div>
+          <div class="am">${fmt(e.amount)}</div>
+        </div>`;
+      }).join('');
+      existWrap.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+        cb.addEventListener('change', ()=>{
+          if(cb.checked) scnExcluded.delete(cb.dataset.id);
+          else scnExcluded.add(cb.dataset.id);
+          saveState(); renderScenario();
+        });
+      });
+    }
+
+    const addedWrap = document.getElementById('scn-added');
+    if(scnAdded.length===0){
+      addedWrap.innerHTML = '<div class="empty-note">尚未新增假設項目</div>';
+    } else {
+      addedWrap.innerHTML = scnAdded.map(s=>`
+        <div class="scn-item-row">
+          <div class="nm">${escapeHtml(s.name)}</div>
+          <div>
+            <span class="am">${fmt(s.amount)}</span>
+            <button class="txn-del" data-id="${s.id}" title="刪除">✕</button>
+          </div>
+        </div>`).join('');
+      addedWrap.querySelectorAll('.txn-del').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          scnAdded = scnAdded.filter(s=>s.id!==btn.dataset.id);
+          saveState(); renderScenario();
+        });
+      });
+    }
+
+    const income = txns.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
+    const includedExpense = expenses.filter(e=>!scnExcluded.has(e.id)).reduce((s,t)=>s+Number(t.amount),0);
+    const addedExpense = scnAdded.reduce((s,t)=>s+Number(t.amount),0);
+    const balance = income - includedExpense - addedExpense;
+    document.getElementById('scn-balance').textContent = fmt(balance);
+  }
+
+  // ---------- render: planning (goals / achievement / plan-vs-actual / review) ----------
+  // Achievement is derived only from actual figures the user has entered for
+  // this month (categoryActuals) — never from the recurring txns template —
+  // so a category with no actual entry yet counts as "not recorded" rather
+  // than silently passing or failing.
+  function renderPlanAchieve(){
+    const wrap = document.getElementById('plan-achieve');
+    const income = txns.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
+    const expenseCats = txns.filter(t=>t.type==='expense');
+    const recorded = expenseCats.filter(e=>categoryActuals[e.name] !== undefined);
+    const pendingCount = expenseCats.length - recorded.length;
+    const actualExpense = recorded.reduce((s,e)=>s+Number(categoryActuals[e.name]),0);
+    const balance = income - actualExpense;
+
+    const savingsGoal = Number(planGoals.savings) || 0;
+    const expenseCap = Number(planGoals.expenseCap) || 0;
+    const pendingNote = pendingCount > 0
+      ? `<div class="detail" style="margin-top:3px;">（尚有 ${pendingCount} 項未填實際花費，僅計入已填項目）</div>` : '';
+
+    let savingsCard;
+    if(recorded.length === 0){
+      savingsCard = `<div class="achieve-card">
+        <div><div class="nm">儲蓄目標${savingsGoal>0?` ${fmt(savingsGoal)}`:''}</div><div class="detail">尚未填寫任何實際花費</div></div>
+        <span class="badge na">待輸入</span>
+      </div>`;
+    } else if(savingsGoal > 0){
+      const diff = balance - savingsGoal;
+      const badge = diff >= 0
+        ? `<span class="badge ok">達成，超出 ${fmt(diff)}</span>`
+        : `<span class="badge no">未達成，還差 ${fmt(Math.abs(diff))}</span>`;
+      savingsCard = `<div class="achieve-card">
+        <div><div class="nm">儲蓄目標 ${fmt(savingsGoal)}</div><div class="detail">實際結餘 ${fmt(balance)}</div>${pendingNote}</div>
+        ${badge}
+      </div>`;
+    } else {
+      savingsCard = `<div class="achieve-card">
+        <div><div class="nm">儲蓄目標</div><div class="detail">尚未設定目標</div></div>
+        <span class="badge na">未設定</span>
+      </div>`;
+    }
+
+    let expenseCard;
+    if(recorded.length === 0){
+      expenseCard = `<div class="achieve-card">
+        <div><div class="nm">支出上限${expenseCap>0?` ${fmt(expenseCap)}`:''}</div><div class="detail">尚未填寫任何實際花費</div></div>
+        <span class="badge na">待輸入</span>
+      </div>`;
+    } else if(expenseCap > 0){
+      const diff = expenseCap - actualExpense;
+      const badge = diff >= 0
+        ? `<span class="badge ok">達成，剩餘 ${fmt(diff)}</span>`
+        : `<span class="badge no">超支 ${fmt(Math.abs(diff))}</span>`;
+      expenseCard = `<div class="achieve-card">
+        <div><div class="nm">支出上限 ${fmt(expenseCap)}</div><div class="detail">實際支出 ${fmt(actualExpense)}</div>${pendingNote}</div>
+        ${badge}
+      </div>`;
+    } else {
+      expenseCard = `<div class="achieve-card">
+        <div><div class="nm">支出上限</div><div class="detail">尚未設定目標</div></div>
+        <span class="badge na">未設定</span>
+      </div>`;
+    }
+
+    wrap.innerHTML = savingsCard + expenseCard;
+  }
+
+  function renderPlanItems(){
+    const wrap = document.getElementById('plan-cat-budget');
+    const expenses = txns.filter(t=>t.type==='expense');
+    if(expenses.length===0){
+      wrap.innerHTML = '<div class="empty-note">尚無支出項目</div>';
+      return;
+    }
+    wrap.innerHTML = expenses.map(e=>{
+      const targetRaw = categoryBudgets[e.name];
+      const target = targetRaw !== undefined ? Number(targetRaw) : Number(e.amount);
+      const actualRaw = categoryActuals[e.name];
+      const hasActual = actualRaw !== undefined;
+      const actual = hasActual ? Number(actualRaw) : 0;
+
+      let badge, fillColor, width;
+      if(!hasActual){
+        badge = '<span class="badge na">尚未填實際</span>';
+        fillColor = 'var(--ink-soft)'; width = 0;
+      } else if(target <= 0){
+        badge = '<span class="badge na">未設定目標</span>';
+        fillColor = 'var(--ink-soft)'; width = 0;
+      } else {
+        const pct = Math.round((actual / target) * 100);
+        width = Math.min(100, Math.max(4, pct));
+        if(actual <= target){ badge = `<span class="badge ok">達成 ${pct}%</span>`; fillColor = 'var(--green)'; }
+        else{ badge = `<span class="badge no">超支 ${pct}%</span>`; fillColor = 'var(--seal)'; }
+      }
+
+      return `<div class="budget-row">
+        <div class="cat-name">${escapeHtml(e.name)}</div>
+        <input class="plan-target" type="number" min="0" placeholder="目標" data-name="${escapeHtml(e.name)}" value="${targetRaw !== undefined ? targetRaw : e.amount}">
+        <input class="plan-actual" type="number" min="0" placeholder="實際" data-name="${escapeHtml(e.name)}" value="${hasActual ? actualRaw : ''}">
+        <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${width}%; background:${fillColor};"></div></div>
+        ${badge}
+      </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('.plan-target').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const v = parseFloat(inp.value);
+        if(isNaN(v) || v<=0){ delete categoryBudgets[inp.dataset.name]; }
+        else { categoryBudgets[inp.dataset.name] = v; }
+        saveState(); renderPlanItems(); renderPlanAchieve();
+      });
+    });
+    wrap.querySelectorAll('.plan-actual').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const v = parseFloat(inp.value);
+        if(isNaN(v)){ delete categoryActuals[inp.dataset.name]; }
+        else { categoryActuals[inp.dataset.name] = v; }
+        saveState(); renderPlanItems(); renderPlanAchieve();
+      });
+    });
+  }
+
+  function renderReviews(){
+    const wrap = document.getElementById('review-list');
+    if(reviews.length===0){
+      wrap.innerHTML = '<div class="empty-note">尚未新增任何檢討紀錄</div>';
+      return;
+    }
+    const sorted = reviews.slice().sort((a,b)=> b.month.localeCompare(a.month));
+    wrap.innerHTML = sorted.map(r=>`
+      <div class="review-item">
+        <div class="rm">
+          <span class="month">${escapeHtml(r.month)}</span>
+          <button class="txn-del" data-id="${r.id}" title="刪除">✕</button>
+        </div>
+        <div class="txt">${escapeHtml(r.text)}</div>
+      </div>`).join('');
+    wrap.querySelectorAll('.txn-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        reviews = reviews.filter(r=>r.id!==btn.dataset.id);
+        saveState(); renderReviews();
+      });
+    });
+  }
+
+  function initPlanningInputs(){
+    document.getElementById('goal-savings').value = planGoals.savings || '';
+    document.getElementById('goal-expense-cap').value = planGoals.expenseCap || '';
+    document.getElementById('review-month').value = currentMonthStr();
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function renderAll(){
+    renderOverview();
+    renderTxnList('income','list-income');
+    renderTxnList('expense','list-expense');
+    renderScenario();
+    renderPlanAchieve();
+    renderPlanItems();
+    renderReviews();
+  }
+
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.target).classList.add('active');
+    });
+  });
+
+  // ---------- add transaction ----------
+  document.getElementById('tx-add').addEventListener('click', ()=>{
+    const type = document.getElementById('tx-type').value;
+    const nameEl = document.getElementById('tx-name');
+    const amtEl = document.getElementById('tx-amount');
+    const name = nameEl.value.trim();
+    const amount = parseFloat(amtEl.value);
+    if(!name || isNaN(amount) || amount < 0) return;
+    txns.push({id: uid(), type, name, amount});
+    nameEl.value=''; amtEl.value='';
+    saveState(); renderAll();
+  });
+
+  // ---------- add scenario item ----------
+  document.getElementById('scn-add-btn').addEventListener('click', ()=>{
+    const nameEl = document.getElementById('scn-name');
+    const amtEl = document.getElementById('scn-amount');
+    const name = nameEl.value.trim();
+    const amount = parseFloat(amtEl.value);
+    if(!name || isNaN(amount) || amount < 0) return;
+    scnAdded.push({id: uid(), name, amount});
+    nameEl.value=''; amtEl.value='';
+    saveState(); renderScenario();
+  });
+
+  // ---------- save monthly goals ----------
+  document.getElementById('goal-save').addEventListener('click', ()=>{
+    const s = parseFloat(document.getElementById('goal-savings').value);
+    const c = parseFloat(document.getElementById('goal-expense-cap').value);
+    planGoals.savings = isNaN(s) ? 0 : s;
+    planGoals.expenseCap = isNaN(c) ? 0 : c;
+    saveState(); renderPlanAchieve();
+  });
+
+  // ---------- add monthly review ----------
+  document.getElementById('review-add').addEventListener('click', ()=>{
+    const monthEl = document.getElementById('review-month');
+    const textEl = document.getElementById('review-text');
+    const month = monthEl.value || currentMonthStr();
+    const text = textEl.value.trim();
+    if(!text) return;
+    reviews.push({id: uid(), month, text});
+    textEl.value='';
+    saveState(); renderReviews();
+  });
+
+  loadState().then(()=>{
+    initPlanningInputs();
+    renderAll();
+  });
+})();
+</script>
+
+</body>
+</html>
