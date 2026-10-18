@@ -1,0 +1,126 @@
+# 自動部署到 Cloudflare Pages
+# 觸發：push 到 master，或在 GitHub → Actions 手動執行
+# 會自動：建立 KV（若不存在）、建立 Pages 專案（若不存在）、綁定 KV 與密碼、部署
+# 需要的 GitHub Secrets：CLOUDFLARE_API_TOKEN、CLOUDFLARE_ACCOUNT_ID、FINANCE_PASSCODE
+
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      FINANCE_PASSCODE: ${{ secrets.FINANCE_PASSCODE }}
+      PROJECT: finance-planner-app
+      KV_TITLE: finance-planner-kv
+      COMPAT_DATE: "2024-09-23"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 檢查 Secrets
+        run: |
+          missing=""
+          [ -z "$CLOUDFLARE_API_TOKEN" ]  && missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -z "$CLOUDFLARE_ACCOUNT_ID" ] && missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          [ -z "$FINANCE_PASSCODE" ]      && missing="$missing FINANCE_PASSCODE"
+          if [ -n "$missing" ]; then
+            echo "::error::缺少 GitHub Secrets:$missing（到 repo → Settings → Secrets and variables → Actions 新增）"
+            exit 1
+          fi
+
+      - name: 確認 KV、專案、綁定
+        id: setup
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+
+          check() { # 檢查 Cloudflare API 回應
+            if [ "$(echo "$1" | jq -r '.success')" != "true" ]; then
+              echo "::error::Cloudflare API 錯誤：$(echo "$1" | jq -c '.errors')"; exit 1
+            fi
+          }
+
+          # 1) KV namespace
+          R=$(curl -sS "${AUTH[@]}" "$API/storage/kv/namespaces?per_page=100"); check "$R"
+          KV_ID=$(echo "$R" | jq -r --arg t "$KV_TITLE" '.result[] | select(.title==$t) | .id' | head -1)
+          if [ -z "$KV_ID" ]; then
+            R=$(curl -sS -X POST "${AUTH[@]}" "$API/storage/kv/namespaces" -d "$(jq -n --arg t "$KV_TITLE" '{title:$t}')"); check "$R"
+            KV_ID=$(echo "$R" | jq -r '.result.id')
+            echo "已建立 KV：$KV_ID"
+          else
+            echo "沿用既有 KV：$KV_ID"
+          fi
+
+          # 2) Pages 專案
+          R=$(curl -sS "${AUTH[@]}" "$API/pages/projects/$PROJECT")
+          if [ "$(echo "$R" | jq -r '.success')" != "true" ]; then
+            echo "專案不存在，建立 $PROJECT"
+            R=$(curl -sS -X POST "${AUTH[@]}" "$API/pages/projects" \
+              -d "$(jq -n --arg n "$PROJECT" '{name:$n, production_branch:"master"}')"); check "$R"
+          fi
+          PROD_BRANCH=$(echo "$R" | jq -r '.result.production_branch // "master"')
+          SOURCE=$(echo "$R" | jq -r '.result.source.type // "direct"')
+          echo "production_branch=$PROD_BRANCH source=$SOURCE"
+
+          # 3) 綁定 KV + 密碼（production 與 preview 都設）
+          CFG=$(jq -n --arg kv "$KV_ID" --arg pw "$FINANCE_PASSCODE" --arg cd "$COMPAT_DATE" '
+            {compatibility_date:$cd,
+             kv_namespaces:{FINANCE_KV:{namespace_id:$kv}},
+             env_vars:{PASSCODE:{type:"secret_text", value:$pw}}}')
+          BODY=$(jq -n --argjson c "$CFG" '{deployment_configs:{production:$c, preview:$c}}')
+          if [ "$SOURCE" = "github" ] || [ "$SOURCE" = "gitlab" ]; then
+            # 專案是直接連 Git 的：讓 Cloudflare 從 public/ 輸出
+            BODY=$(echo "$BODY" | jq '. + {build_config:{destination_dir:"public", build_command:""}}')
+          fi
+          R=$(curl -sS -X PATCH "${AUTH[@]}" "$API/pages/projects/$PROJECT" -d "$BODY"); check "$R"
+          echo "已更新綁定"
+
+          echo "prod_branch=$PROD_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+
+      - name: 部署（Direct Upload）
+        if: steps.setup.outputs.source != 'github' && steps.setup.outputs.source != 'gitlab'
+        run: |
+          npx --yes wrangler@3 pages deploy public \
+            --project-name "$PROJECT" \
+            --branch "${{ steps.setup.outputs.prod_branch }}" \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-message "$(git log -1 --pretty=%s | head -c 200)"
+
+      - name: 部署（專案連著 Git → 觸發 Cloudflare 重新建置）
+        if: steps.setup.outputs.source == 'github' || steps.setup.outputs.source == 'gitlab'
+        run: |
+          set -euo pipefail
+          R=$(curl -sS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments")
+          echo "$R" | jq -c '{success, errors, url: .result.url}'
+          [ "$(echo "$R" | jq -r '.success')" = "true" ]
+
+      - name: 健康檢查
+        run: |
+          sleep 15
+          URL="https://$PROJECT.pages.dev"
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/")
+          api=$(curl -s -H "X-Passcode: $FINANCE_PASSCODE" "$URL/api/state" | head -c 60)
+          echo "首頁 HTTP $code；API 回應開頭：$api"
+          [ "$code" = "200" ] || { echo "::error::首頁不是 200"; exit 1; }
+          case "$api" in
+            *server_missing*|*unauthorized*) echo "::error::API 設定有問題：$api"; exit 1 ;;
+            "<"*) echo "::error::/api/state 回傳的是網頁不是 JSON，functions 沒有部署到"; exit 1 ;;
+          esac
+          echo "✅ 部署完成：$URL"

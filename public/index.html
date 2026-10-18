@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>財務規劃簿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F2EDE1; --line:#CBBFA0; --line-soft:#DAD0B8;
+    --ink:#2B2A28; --ink-soft:#6B6355;
+    --seal:#A6321E; --seal-soft:#c25a45; --green:#3F6B4A; --gold:#9c7b30;
+    --shadow:0 18px 40px rgba(43,42,40,0.18);
+    --mono:'JetBrains Mono',monospace; --serif:'Noto Serif TC',serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(ellipse at top,#EFE8D6,#DDD2B4 120%);
+    min-height:100vh; font-family:'Noto Sans TC',sans-serif; color:var(--ink);
+    display:flex; justify-content:center; padding:32px 12px 80px;
+  }
+  .book{width:100%;max-width:820px;}
+  button{font-family:inherit;}
+  input,select,textarea{font-family:inherit;color:var(--ink);}
+
+  .cover{background:linear-gradient(180deg,#4a3527,#33241a);border-radius:6px 6px 0 0;padding:28px 28px 22px;color:#EFE3C8;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+  .cover::before{content:"";position:absolute;inset:8px;border:1px solid rgba(239,227,200,0.35);pointer-events:none;}
+  .cover .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  .cover .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:0.28em;color:#C9A85C;text-transform:uppercase;}
+  .cover h1{font-family:var(--serif);font-weight:900;font-size:clamp(26px,5.5vw,36px);margin:8px 0 4px;letter-spacing:0.06em;}
+  .cover .sub{font-size:13px;color:#cbb98a;}
+  .sync{position:relative;z-index:1;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid rgba(239,227,200,0.35);color:#EFE3C8;background:rgba(0,0,0,0.15);cursor:pointer;white-space:nowrap;}
+  .sync .d{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:#999;vertical-align:1px;}
+  .sync.cloud .d{background:#7fbf8a;} .sync.local .d{background:#C9A85C;} .sync.err .d,.sync.auth .d{background:#e07a62;}
+
+  .tabs{display:flex;background:#3a2a1e;}
+  .tab{flex:1;text-align:center;padding:13px 6px;font-family:var(--serif);font-weight:700;font-size:14px;color:#c9b78a;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;letter-spacing:0.03em;}
+  .tab.active{color:#F2EDE1;border-bottom-color:var(--seal);background:linear-gradient(180deg,rgba(255,255,255,0.04),transparent);}
+
+  .page{background:var(--paper);padding:26px 24px 36px;box-shadow:var(--shadow);border-radius:0 0 6px 6px;min-height:420px;}
+  .view{display:none;} .view.active{display:block;animation:fadeIn .35s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  .section-title{font-family:var(--serif);font-weight:700;font-size:14.5px;margin:26px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .section-title:first-child{margin-top:0;}
+  .section-title small{font-family:'Noto Sans TC',sans-serif;font-weight:400;font-size:12px;color:var(--ink-soft);}
+  .hint{font-size:12.5px;color:var(--ink-soft);line-height:1.7;margin:0 0 12px;}
+  .num{font-family:var(--mono);}
+  .pos{color:var(--green);} .neg{color:var(--seal);}
+
+  .btn{background:var(--seal);color:#fff;border:none;border-radius:3px;padding:9px 14px;font-family:var(--serif);font-weight:700;cursor:pointer;font-size:13.5px;}
+  .btn:hover{background:#8a2a19;}
+  .btn.dark{background:var(--ink);color:#F2EDE1;} .btn.dark:hover{background:#000;}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);} .btn.ghost:hover{background:rgba(255,255,255,0.5);}
+  .btn.sm{padding:6px 10px;font-size:12.5px;}
+  .x{background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;opacity:0.5;}
+  .x:hover{opacity:1;color:var(--seal);}
+  .inp{font-size:13.5px;padding:8px 9px;border:1px solid var(--line);border-radius:3px;background:#fff;width:100%;min-width:0;}
+  .inp.num{font-family:var(--mono);text-align:right;}
+  .inp.actual{border-color:var(--seal-soft);}
+  .inp.actual:placeholder-shown{background:#fbf8f1;}
+
+  .badge{font-family:var(--serif);font-weight:700;font-size:11.5px;padding:4px 10px;border-radius:20px;white-space:nowrap;display:inline-block;}
+  .badge.ok{background:rgba(63,107,74,0.15);color:var(--green);}
+  .badge.no{background:rgba(166,50,30,0.14);color:var(--seal);}
+  .badge.go{background:rgba(156,123,48,0.16);color:var(--gold);}
+  .badge.na{background:rgba(107,99,85,0.12);color:var(--ink-soft);}
+
+  /* hero */
+  .hero{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:18px 20px;border:2px solid var(--ink);border-radius:4px;background:rgba(255,255,255,0.25);margin-bottom:6px;}
+  .hero .lbl{font-family:var(--serif);font-weight:700;font-size:13.5px;color:var(--ink-soft);}
+  .hero .big{font-family:var(--mono);font-weight:700;font-size:30px;margin-top:4px;}
+  .hero .meta{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:4px;}
+  .stamp{width:76px;height:76px;transform:rotate(-9deg);flex-shrink:0;}
+  .stamp svg{width:100%;height:100%;display:block;}
+
+  /* timeline */
+  .timeline{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .mcard{display:flex;flex-direction:column;justify-content:flex-start;text-align:left;border:1px solid var(--line-soft);background:rgba(255,255,255,0.35);border-radius:4px;padding:11px 12px;cursor:pointer;transition:transform .15s,border-color .15s;}
+  .mcard:hover{transform:translateY(-2px);border-color:var(--line);}
+  .mcard.cur{border:2px solid var(--seal);padding:10px 11px;}
+  .mcard.none{background:transparent;border-style:dashed;}
+  .mcard .mk{font-family:var(--mono);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;}
+  .mcard .ln{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .mcard .ln b{font-family:var(--mono);font-weight:500;color:var(--ink);}
+  .mcard .bd{margin-top:8px;}
+
+  /* goals */
+  .goal{border:1px solid var(--line-soft);background:rgba(255,255,255,0.35);border-radius:4px;padding:14px 16px;margin-bottom:10px;}
+  .goal .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .goal .nm{font-family:var(--serif);font-weight:700;font-size:15px;}
+  .goal .rng{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);}
+  .bar{position:relative;height:12px;background:rgba(107,99,85,0.13);border-radius:6px;margin:12px 0 8px;overflow:visible;}
+  .bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--green);}
+  .bar .mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);}
+  .bar .mark::after{content:"應有";position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--ink-soft);white-space:nowrap;}
+  .goal .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px;}
+  .goal .stats div{font-size:11.5px;color:var(--ink-soft);}
+  .goal .stats b{display:block;font-family:var(--mono);font-size:14px;color:var(--ink);font-weight:700;margin-top:2px;}
+
+  /* chart */
+  .chart{width:100%;height:auto;display:block;}
+  .legend{display:flex;gap:16px;font-size:11.5px;color:var(--ink-soft);margin:4px 0 8px;}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+
+  /* month view */
+  .mbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .mbar .inp{width:auto;font-family:var(--mono);}
+  .mbar .sp{flex:1;}
+  .grid-head,.irow{display:grid;grid-template-columns:minmax(0,1fr) 96px 96px 84px 26px;gap:8px;align-items:center;}
+  .grid-head{font-size:11.5px;color:var(--ink-soft);padding:0 2px 6px;border-bottom:1px solid var(--line-soft);}
+  .grid-head span:nth-child(n+2){text-align:right;}
+  .irow{padding:7px 2px;border-bottom:1px solid var(--line-soft);font-size:13.5px;}
+  .irow .nmc{display:flex;align-items:center;gap:8px;min-width:0;}
+  .irow .nmc .inp{border-color:transparent;background:transparent;padding:6px 4px;}
+  .irow .nmc .inp:focus{border-color:var(--line);background:#fff;}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .dot.in{background:var(--green);} .dot.out{background:var(--seal);} .dot.gl{background:var(--gold);}
+  .diff{font-family:var(--mono);font-size:12.5px;text-align:right;}
+  .group-lbl{font-size:12px;color:var(--ink-soft);margin:14px 0 2px;font-family:var(--serif);font-weight:700;}
+  .addrow{display:grid;grid-template-columns:90px minmax(0,1fr) 110px auto;gap:8px;margin-top:12px;}
+
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .sc{padding:12px 14px;background:rgba(255,255,255,0.35);border:1px solid var(--line-soft);border-radius:4px;}
+  .sc .k{font-size:11.5px;color:var(--ink-soft);}
+  .sc .v{font-family:var(--mono);font-weight:700;font-size:17px;margin-top:4px;}
+  .sc .p{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .verdict{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+  .verdict .vc{flex:1;min-width:200px;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 14px;border:1px solid var(--line-soft);border-radius:4px;background:rgba(255,255,255,0.35);font-size:13px;}
+
+  textarea.inp{resize:vertical;line-height:1.6;}
+  .empty{border:1px dashed var(--line);border-radius:4px;padding:28px 18px;text-align:center;color:var(--ink-soft);font-size:13.5px;}
+  .empty .acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px;}
+  .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line-soft);border-radius:4px;background:rgba(255,255,255,0.3);font-size:13px;}
+  .tools .inp{width:64px;}
+
+  /* settings */
+  .trow{display:grid;grid-template-columns:90px minmax(0,1fr) 110px 26px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);}
+  .grow{display:grid;grid-template-columns:minmax(0,1.3fr) 110px 120px 120px 100px 26px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);}
+  .ghead{font-size:11px;color:var(--ink-soft);border-bottom:1px solid var(--line-soft);padding-bottom:4px;}
+  .kv{font-size:13px;line-height:1.9;}
+  .kv code{font-family:var(--mono);font-size:12px;background:rgba(107,99,85,0.1);padding:1px 5px;border-radius:3px;}
+
+  .footnote{text-align:center;font-size:11px;color:var(--ink-soft);margin-top:22px;font-family:var(--mono);letter-spacing:0.04em;}
+
+  .modal{position:fixed;inset:0;background:rgba(43,42,40,0.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:50;}
+  .modal.show{display:flex;}
+  .modal .box{background:var(--paper);border-radius:6px;padding:24px;max-width:360px;width:100%;box-shadow:var(--shadow);}
+  .modal h3{font-family:var(--serif);margin:0 0 8px;}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#F2EDE1;padding:9px 16px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:60;}
+  .toast.show{opacity:1;}
+
+  @media (max-width:600px){
+    .page{padding:20px 14px 30px;}
+    .grid-head,.irow{grid-template-columns:minmax(0,1fr) 82px 82px 22px;gap:6px;}
+    .irow .inp.num{padding:7px 5px;font-size:12.5px;}
+    .grid-head span:nth-child(4),.irow .diff{display:none;}
+    .addrow{grid-template-columns:80px minmax(0,1fr);}
+    .addrow .inp.num{grid-column:1;} .addrow .btn{grid-column:2;}
+    .summary{grid-template-columns:1fr;}
+    .hero .big{font-size:24px;} .stamp{width:56px;height:56px;}
+    .tab{font-size:13px;padding:11px 4px;}
+    .trow{grid-template-columns:74px minmax(0,1fr) 84px 22px;}
+    .grow{grid-template-columns:1fr 1fr;} .grow.ghead{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="book">
+  <div class="cover">
+    <div class="row">
+      <div>
+        <div class="eyebrow">FINANCE PLANNER · 財務規劃</div>
+        <h1>財務規劃簿</h1>
+        <div class="sub">每月計畫 · 實際對帳 · 未來進度追蹤</div>
+      </div>
+      <button class="sync" id="sync-pill" title="同步狀態"><span class="d"></span><span id="sync-txt">載入中…</span></button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-target="v-progress">進度總覽</button>
+    <button class="tab" data-target="v-month">月份規劃</button>
+    <button class="tab" data-target="v-settings">範本與目標</button>
+  </div>
+
+  <div class="page">
+    <!-- ============ 進度總覽 ============ -->
+    <section class="view active" id="v-progress">
+      <div class="hero">
+        <div>
+          <div class="lbl" id="hero-lbl">本月實際結餘</div>
+          <div class="big" id="hero-big">$0</div>
+          <div class="meta" id="hero-meta"></div>
+        </div>
+        <div class="stamp" id="hero-stamp"></div>
+      </div>
+
+      <div class="section-title">每月進度 <small>點月份可進去填寫</small></div>
+      <div class="timeline" id="timeline"></div>
+
+      <div class="section-title">計畫結餘 vs 實際結餘</div>
+      <div class="legend"><span><i style="background:#CBBFA0"></i>計畫</span><span><i style="background:#3F6B4A"></i>實際（達標）</span><span><i style="background:#A6321E"></i>實際（未達標）</span></div>
+      <div id="chart"></div>
+
+      <div class="section-title">長期目標 <small>依每月「實際存入」累計</small></div>
+      <div id="goal-list"></div>
+    </section>
+
+    <!-- ============ 月份規劃 ============ -->
+    <section class="view" id="v-month">
+      <div class="mbar">
+        <button class="btn ghost sm" id="m-prev" aria-label="上個月">‹</button>
+        <input type="month" class="inp" id="m-pick">
+        <button class="btn ghost sm" id="m-next" aria-label="下個月">›</button>
+        <button class="btn ghost sm" id="m-today">本月</button>
+        <span class="sp"></span>
+        <span id="m-status"></span>
+      </div>
+      <div id="m-body"></div>
+    </section>
+
+    <!-- ============ 範本與目標 ============ -->
+    <section class="view" id="v-settings">
+      <div class="section-title">固定收支範本 <small>建立新月份時會用這份當預設計畫</small></div>
+      <div id="tpl-list"></div>
+      <div class="addrow" style="grid-template-columns:90px minmax(0,1fr) 110px auto;">
+        <select class="inp" id="tpl-type"><option value="expense">支出</option><option value="income">收入</option></select>
+        <input class="inp" id="tpl-name" placeholder="項目名稱">
+        <input class="inp num" id="tpl-amt" type="number" min="0" placeholder="金額">
+        <button class="btn" id="tpl-add">新增</button>
+      </div>
+      <p class="hint" style="margin-top:8px;">範本月結餘：<b class="num" id="tpl-total"></b>。修改範本不會改到已經建立的月份。</p>
+
+      <div class="section-title">長期目標 <small>例如結婚基金、頭期款、緊急預備金</small></div>
+      <div class="grow ghead"><span>名稱</span><span>目標金額</span><span>開始月</span><span>截止月</span><span>起始已存</span><span></span></div>
+      <div id="goal-edit"></div>
+      <div style="margin-top:10px;"><button class="btn dark sm" id="goal-add">＋ 新增目標</button></div>
+      <p class="hint" style="margin-top:8px;">建立新月份時，每個目標的預設「計畫存入」＝ 尚差金額 ÷ 剩餘月數，之後可在月份頁自己改。</p>
+
+      <div class="section-title">同步與備份</div>
+      <div class="kv" id="sync-info"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button class="btn ghost sm" id="btn-pass">輸入／更換密碼</button>
+        <button class="btn ghost sm" id="btn-sync">立即同步</button>
+        <button class="btn ghost sm" id="btn-export">匯出 JSON 備份</button>
+        <label class="btn ghost sm" style="cursor:pointer;">匯入 JSON<input type="file" id="btn-import" accept="application/json" hidden></label>
+      </div>
+
+      <div class="section-title">雲端歷史備份 <small>每天一份，永久保存</small></div>
+      <div id="bk-list"><div class="hint">連上雲端後可查看</div></div>
+    </section>
+  </div>
+  <div class="footnote" id="foot">資料存在 Cloudflare KV，跨裝置同步；每天自動備份</div>
+</div>
+
+<div class="modal" id="pass-modal">
+  <div class="box">
+    <h3>輸入密碼</h3>
+    <p class="hint">這是你在 Cloudflare 設定的 PASSCODE。只會存在這台裝置的瀏覽器裡。</p>
+    <input class="inp" type="password" id="pass-input" placeholder="密碼" autocomplete="current-password">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn ghost sm" id="pass-cancel">先用本機模式</button>
+      <button class="btn sm" id="pass-ok">確定</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+/* ================= 工具 ================= */
+const $ = s => document.querySelector(s);
+const fmt = n => (n<0?'−$':'$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const fmtS = n => (n>0?'+':'') + fmt(n);
+const uid = () => 'x' + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-3);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+const ymNow = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
+const addM = (ym, n) => { let [y,m] = ym.split('-').map(Number); m += n; y += Math.floor((m-1)/12); m = ((m-1)%12+12)%12+1; return y + '-' + String(m).padStart(2,'0'); };
+const span = (a, b) => { const out = []; if(!a||!b||a>b) return out; for(let k=a; k<=b; k=addM(k,1)) out.push(k); return out; };
+const label = ym => { const [y,m] = ym.split('-'); return `${y} 年 ${Number(m)} 月`; };
+const short = ym => { const [y,m] = ym.split('-'); return `${y.slice(2)}/${m}`; };
+const LS_STATE = 'fp:state:v2', LS_PASS = 'fp:pass';
+const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const lsSet = (k,v) => { try{ localStorage.setItem(k,v); }catch(e){} };
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),1800); }
+
+/* ================= 預設資料 ================= */
+function defaultState(){
+  const cur = ymNow();
+  const s = {
+    version: 2, updatedAt: 0,
+    template: [
+      {id:uid(), type:'income',  name:'薪水', amount:54000},
+      {id:uid(), type:'income',  name:'薪水（掃地）', amount:2000},
+      {id:uid(), type:'expense', name:'飲食', amount:16000},
+      {id:uid(), type:'expense', name:'家用費', amount:11000},
+      {id:uid(), type:'expense', name:'貸款', amount:15000},
+      {id:uid(), type:'expense', name:'電話費', amount:500},
+      {id:uid(), type:'expense', name:'機車加油費', amount:600},
+      {id:uid(), type:'expense', name:'AI 費用', amount:1000},
+      {id:uid(), type:'expense', name:'慈善捐款', amount:500},
+      {id:uid(), type:'expense', name:'skool 費用', amount:288},
+      {id:uid(), type:'expense', name:'skool 遊牧民族', amount:323},
+      {id:uid(), type:'expense', name:'iCloud', amount:90},
+      {id:uid(), type:'expense', name:'Google 雲端', amount:65},
+    ],
+    goals: [
+      {id:uid(), name:'結婚基金', target:112500, start:'2026-09', end:'2026-12', saved:0},
+    ],
+    months: {},
+  };
+  return s;
+}
+
+/* ================= 狀態 / 計算 ================= */
+let S = defaultState();
+let viewMonth = ymNow();
+
+function goalActiveIn(g, k){ return k >= g.start && k <= g.end; }
+function goalCum(g, uptoKey, field){ // 累計（含 uptoKey）
+  let sum = Number(g.saved)||0;
+  Object.keys(S.months).forEach(k=>{
+    if(uptoKey && k > uptoKey) return;
+    const e = S.months[k].goals?.[g.id];
+    if(e && e[field] != null) sum += Number(e[field])||0;
+  });
+  return sum;
+}
+function defaultGoalPlan(g, k){
+  if(!goalActiveIn(g,k)) return 0;
+  // 尚差金額（扣掉 k 之前已規劃/已存的）÷ 剩餘月數
+  let before = Number(g.saved)||0;
+  Object.keys(S.months).forEach(mk=>{
+    if(mk >= k) return;
+    const e = S.months[mk].goals?.[g.id];
+    if(e) before += Number(e.actual != null ? e.actual : e.plan) || 0;
+  });
+  const left = span(k, g.end).length;
+  return Math.max(0, Math.round((Number(g.target) - before) / Math.max(1,left)));
+}
+function activeGoals(k){
+  const m = S.months[k];
+  return S.goals.filter(g => goalActiveIn(g,k) || (m && m.goals && m.goals[g.id]));
+}
+function makeMonth(k, items, fromGoals){
+  const m = { items: items.map(i => ({id:uid(), type:i.type, name:i.name, plan:Number(i.plan ?? i.amount)||0, actual:null})), goals:{}, note:'' };
+  delete S.months[k];
+  S.goals.forEach(g => {
+    if(!goalActiveIn(g,k)) return;
+    const src = fromGoals && fromGoals[g.id];
+    m.goals[g.id] = {plan: src ? (Number(src.plan)||0) : defaultGoalPlan(g,k), actual:null};
+  });
+  S.months[k] = m;
+  return m;
+}
+function prevPlannedKey(k){ return Object.keys(S.months).filter(x => x < k).sort().pop(); }
+
+function summarize(k){
+  const m = S.months[k];
+  if(!m) return null;
+  const r = {planIn:0, planOut:0, actIn:0, actOut:0, filled:0, total:0, goalPlan:0, goalAct:0, goalFilled:0, goalTotal:0};
+  m.items.forEach(i=>{
+    const p = Number(i.plan)||0;
+    if(i.type==='income') r.planIn += p; else r.planOut += p;
+    r.total++;
+    if(i.actual != null){ r.filled++; if(i.type==='income') r.actIn += Number(i.actual); else r.actOut += Number(i.actual); }
+  });
+  activeGoals(k).forEach(g=>{
+    const e = m.goals[g.id] || {plan:0, actual:null};
+    r.goalTotal++; r.goalPlan += Number(e.plan)||0;
+    if(e.actual != null){ r.goalFilled++; r.goalAct += Number(e.actual)||0; }
+  });
+  r.planBal = r.planIn - r.planOut;
+  r.actBal = r.actIn - r.actOut;
+  r.complete = r.total > 0 && r.filled === r.total && r.goalFilled === r.goalTotal;
+  r.balOk = r.actBal >= r.planBal;
+  r.outOk = r.actOut <= r.planOut;
+  r.goalOk = r.goalAct >= r.goalPlan;
+  return r;
+}
+function status(k){
+  const r = summarize(k), cur = ymNow();
+  if(!r) return {code:'none', cls:'na', text: k < cur ? '未紀錄' : '尚未規劃'};
+  if(r.complete) return (r.balOk && r.goalOk) ? {code:'ok', cls:'ok', text:'達成'} : {code:'no', cls:'no', text:'未達成'};
+  if(k > cur) return {code:'future', cls:'na', text:'已規劃'};
+  if(k === cur) return {code:'going', cls:'go', text:`進行中 ${r.filled+r.goalFilled}/${r.total+r.goalTotal}`};
+  return {code:'pending', cls:'go', text:`待結算 ${r.filled+r.goalFilled}/${r.total+r.goalTotal}`};
+}
+
+/* ================= 同步 ================= */
+let mode = 'init'; // cloud | local | auth | err
+let pushTimer = null, pushing = false, dirty = false;
+
+function setMode(m, extra){
+  mode = m;
+  const pill = $('#sync-pill');
+  pill.className = 'sync ' + ({cloud:'cloud', local:'local', auth:'auth', err:'err'}[m] || '');
+  $('#sync-txt').textContent = ({
+    init:'載入中…', cloud:'已同步雲端', local:'本機模式', auth:'需要密碼', err:'同步失敗'
+  })[m] + (extra ? ' · ' + extra : '');
+  $('#foot').textContent = m === 'cloud'
+    ? '資料存在 Cloudflare KV，跨裝置同步；每天自動備份'
+    : '目前只存在這台裝置的瀏覽器（本機模式），連上雲端後會自動上傳';
+  renderSyncInfo();
+}
+
+function readLocal(){ try{ const t = lsGet(LS_STATE); return t ? JSON.parse(t) : null; }catch(e){ return null; } }
+function normalize(s){
+  if(!s || typeof s !== 'object' || typeof s.months !== 'object') return null;
+  s.template = Array.isArray(s.template) ? s.template : [];
+  s.goals = Array.isArray(s.goals) ? s.goals : [];
+  Object.values(s.months).forEach(m => { m.items = m.items || []; m.goals = m.goals || {}; m.note = m.note || ''; });
+  return s;
+}
+
+async function api(method, body, extraHeaders){
+  const r = await fetch('/api/state', {
+    method, cache:'no-store',
+    headers: Object.assign({'X-Passcode': lsGet(LS_PASS) || ''}, body ? {'content-type':'application/json'} : {}, extraHeaders || {}),
+    body,
+  });
+  const ct = r.headers.get('content-type') || '';
+  if(!ct.includes('json')) { const e = new Error('no_api'); e.noApi = true; throw e; }
+  if(r.status === 401) { const e = new Error('auth'); e.auth = true; throw e; }
+  if(r.status === 409) { const e = new Error('conflict'); e.conflict = true; throw e; }
+  if(!r.ok) { const j = await r.json().catch(()=>({})); throw new Error(j.error || ('http_'+r.status)); }
+  return r.json();
+}
+// LS_BASE：這台裝置最後一次「確定和雲端一致」時的版本號
+const LS_BASE = 'fp:base';
+const getBase = () => { const v = lsGet(LS_BASE); return v == null ? null : Number(v); };
+const setBase = v => lsSet(LS_BASE, String(v || 0));
+function adopt(remote){ S = remote; lsSet(LS_STATE, JSON.stringify(S)); setBase(S.updatedAt); dirty = false; }
+
+async function load(){
+  const local = normalize(readLocal());
+  S = local || defaultState();
+  try{
+    const remote = normalize(await api('GET'));
+    setMode('cloud');
+    const base = getBase();
+    if(!remote){
+      dirty = true; await push();                       // 雲端還是空的 → 上傳這台的資料
+    } else if(!local || (local.updatedAt||0) <= (remote.updatedAt||0)){
+      adopt(remote);                                    // 雲端比較新
+    } else if(base === remote.updatedAt){
+      dirty = true; await push();                       // 這台有離線修改、雲端沒變 → 上傳
+    } else if(base == null){
+      adopt(remote);                                    // 新裝置第一次連線 → 一律以雲端為準
+    } else {
+      // 兩邊都改過
+      if(confirm('雲端和這台裝置都有尚未合併的修改。\n\n按「確定」使用雲端版本（這台的未同步修改會捨棄）\n按「取消」用這台的資料覆蓋雲端')) adopt(remote);
+      else { dirty = true; await push(true); }
+    }
+  }catch(e){
+    if(e.auth){ setMode('auth'); openPass(); }
+    else if(e.noApi){ setMode('local'); }
+    else { setMode('err', e.message); }
+  }
+  ensureCurrentMonth();
+  renderAll();
+}
+
+function ensureCurrentMonth(){
+  const cur = ymNow();
+  if(!S.months[cur]){
+    const prev = prevPlannedKey(cur);
+    makeMonth(cur, prev ? S.months[prev].items : S.template, prev ? S.months[prev].goals : null);
+    save(true);
+  }
+}
+
+function save(silent){
+  S.updatedAt = Date.now();
+  lsSet(LS_STATE, JSON.stringify(S));
+  dirty = true;
+  if(mode === 'cloud' || mode === 'err'){
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(push, 900);
+  }
+}
+async function push(force){
+  if(pushing || !dirty) return;
+  pushing = true; dirty = false;
+  const sentAt = S.updatedAt;
+  try{
+    const base = getBase();
+    await api('PUT', JSON.stringify(S), (force || base == null) ? {} : {'X-Base': String(base)});
+    setBase(sentAt);
+    setMode('cloud');
+  }catch(e){
+    dirty = true;
+    if(e.conflict){
+      pushing = false;
+      if(confirm('另一台裝置剛更新過資料。\n\n按「確定」載入雲端最新版本（這台剛才的修改會捨棄）\n按「取消」用這台的資料覆蓋雲端')){
+        try{ const remote = normalize(await api('GET')); if(remote){ adopt(remote); renderAll(); toast('已載入雲端最新版本'); } }catch(_){}
+      } else { await push(true); }
+      return;
+    }
+    if(e.auth){ setMode('auth'); openPass(); }
+    else if(e.noApi){ setMode('local'); }
+    else setMode('err', e.message);
+  }finally{ pushing = false; if(dirty && mode==='cloud') { clearTimeout(pushTimer); pushTimer = setTimeout(push, 900); } }
+}
+window.addEventListener('beforeunload', e => { if(dirty && mode === 'cloud'){ push(); } });
+
+/* ================= 密碼 ================= */
+function openPass(){ $('#pass-modal').classList.add('show'); setTimeout(()=>$('#pass-input').focus(), 50); }
+$('#pass-ok').addEventListener('click', ()=>{ lsSet(LS_PASS, $('#pass-input').value); $('#pass-modal').classList.remove('show'); $('#pass-input').value=''; load(); });
+$('#pass-input').addEventListener('keydown', e => { if(e.key==='Enter') $('#pass-ok').click(); });
+$('#pass-cancel').addEventListener('click', ()=>{ $('#pass-modal').classList.remove('show'); });
+$('#sync-pill').addEventListener('click', ()=>{ if(mode==='auth') openPass(); else showTab('v-settings'); });
+
+/* ================= 分頁 ================= */
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.target === id));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === id));
+  if(id === 'v-progress') renderProgress();
+  if(id === 'v-month') renderMonth();
+  if(id === 'v-settings') renderSettings();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', ()=>showTab(t.dataset.target)));
+
+/* ================= 進度總覽 ================= */
+function stampSvg(t1, t2, color){
+  return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="${color}" stroke-width="4"/><circle cx="50" cy="50" r="36" fill="none" stroke="${color}" stroke-width="1.5"/><text x="50" y="45" text-anchor="middle" font-family="'Noto Serif TC',serif" font-weight="900" font-size="20" fill="${color}">${t1}</text><text x="50" y="72" text-anchor="middle" font-family="'Noto Serif TC',serif" font-weight="900" font-size="20" fill="${color}">${t2}</text></svg>`;
+}
+function windowKeys(){
+  const cur = ymNow();
+  const keys = new Set(span(addM(cur,-3), addM(cur,6)));
+  S.goals.forEach(g => span(g.start, g.end).forEach(k => { if(k >= addM(cur,-6) && k <= addM(cur,12)) keys.add(k); }));
+  return Array.from(keys).sort();
+}
+function renderProgress(){
+  const cur = ymNow(), r = summarize(cur), st = status(cur);
+  $('#hero-lbl').textContent = `${label(cur)}・實際結餘（已填部分）`;
+  $('#hero-big').textContent = r ? fmt(r.actBal) : '$0';
+  $('#hero-big').className = 'big ' + (r && r.filled ? (r.actBal >= 0 ? 'pos' : 'neg') : '');
+  $('#hero-meta').innerHTML = r ? `計畫結餘 ${fmt(r.planBal)}　·　計畫存入目標 ${fmt(r.goalPlan)}　·　<span class="badge ${st.cls}">${st.text}</span>` : '';
+  $('#hero-stamp').innerHTML = st.code === 'ok' ? stampSvg('達','成','#3F6B4A') : st.code === 'no' ? stampSvg('未','達','#A6321E') : stampSvg('本','月','#9c7b30');
+
+  const keys = windowKeys();
+  $('#timeline').innerHTML = keys.map(k=>{
+    const s = summarize(k), t = status(k);
+    const cls = ['mcard', k===cur?'cur':'', s?'':'none'].join(' ');
+    if(!s) return `<button class="${cls}" data-m="${k}"><div class="mk">${short(k)}</div><div class="ln">${k<cur?'沒有紀錄':'點此建立規劃'}</div><div class="bd"><span class="badge ${t.cls}">${t.text}</span></div></button>`;
+    const showAct = s.filled > 0;
+    return `<button class="${cls}" data-m="${k}">
+      <div class="mk">${short(k)}${k===cur?'<span class="badge go" style="font-size:10px;padding:2px 7px;">本月</span>':''}</div>
+      <div class="ln">計畫結餘 <b>${fmt(s.planBal)}</b></div>
+      <div class="ln">實際結餘 <b class="${showAct ? (s.actBal>=s.planBal?'pos':'neg') : ''}">${showAct ? fmt(s.actBal) : '—'}</b></div>
+      ${s.goalTotal ? `<div class="ln">目標存入 <b>${s.goalFilled ? fmt(s.goalAct) : '—'} / ${fmt(s.goalPlan)}</b></div>` : ''}
+      <div class="bd"><span class="badge ${t.cls}">${t.text}</span></div>
+    </button>`;
+  }).join('');
+  $('#timeline').querySelectorAll('.mcard').forEach(b => b.addEventListener('click', ()=>{ viewMonth = b.dataset.m; showTab('v-month'); }));
+
+  renderChart(keys);
+  renderGoals();
+}
+
+function renderChart(keys){
+  const data = keys.map(k => ({k, s: summarize(k)})).filter(d => d.s);
+  if(!data.length){ $('#chart').innerHTML = '<div class="empty">還沒有任何月份規劃</div>'; return; }
+  const W = 760, H = 220, pl = 54, pr = 10, pt = 14, pb = 28;
+  const vals = data.flatMap(d => [d.s.planBal, d.s.filled ? d.s.actBal : 0]);
+  let max = Math.max(0, ...vals), min = Math.min(0, ...vals);
+  if(max === min) max = min + 1;
+  const pad = (max-min)*0.1; max += pad; if(min < 0) min -= pad;
+  const y = v => pt + (max - v) / (max - min) * (H - pt - pb);
+  const bw = (W - pl - pr) / data.length;
+  const b = Math.min(22, bw * 0.32);
+  const ticks = 4;
+  let g = '';
+  for(let i=0;i<=ticks;i++){
+    const v = min + (max-min)*i/ticks, yy = y(v);
+    g += `<line x1="${pl}" x2="${W-pr}" y1="${yy}" y2="${yy}" stroke="#DAD0B8" stroke-width="1"/>`;
+    g += `<text x="${pl-6}" y="${yy+4}" text-anchor="end" font-size="10" fill="#6B6355" font-family="JetBrains Mono">${Math.round(v/1000)}k</text>`;
+  }
+  g += `<line x1="${pl}" x2="${W-pr}" y1="${y(0)}" y2="${y(0)}" stroke="#6B6355" stroke-width="1"/>`;
+  data.forEach((d,i)=>{
+    const cx = pl + bw*i + bw/2;
+    const p = d.s.planBal, a = d.s.actBal;
+    const rect = (x, v, fill) => { const y0 = y(Math.max(0,v)), h = Math.abs(y(v) - y(0)); return `<rect x="${x}" y="${y0}" width="${b}" height="${Math.max(1,h)}" rx="2" fill="${fill}"><title>${fmt(v)}</title></rect>`; };
+    g += rect(cx - b - 1, p, '#CBBFA0');
+    if(d.s.filled) g += rect(cx + 1, a, a >= p ? '#3F6B4A' : '#A6321E');
+    g += `<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="10.5" fill="${d.k===ymNow()?'#A6321E':'#6B6355'}" font-family="JetBrains Mono" font-weight="${d.k===ymNow()?700:400}">${short(d.k)}</text>`;
+  });
+  $('#chart').innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="每月計畫與實際結餘">${g}</svg>`;
+}
+
+function renderGoals(){
+  const cur = ymNow();
+  if(!S.goals.length){ $('#goal-list').innerHTML = '<div class="empty">尚未設定長期目標，到「範本與目標」新增</div>'; return; }
+  $('#goal-list').innerHTML = S.goals.map(g=>{
+    const target = Number(g.target)||0;
+    const act = goalCum(g, null, 'actual');
+    const lastClosed = cur > g.end ? g.end : addM(cur, -1);
+    const shouldNow = goalCum(g, cur > g.end ? g.end : cur, 'plan');      // 到本月為止「計畫」應存
+    const pct = target ? Math.min(100, act/target*100) : 0;
+    const mpct = target ? Math.min(100, shouldNow/target*100) : 0;
+    const remainMonths = span(cur > g.start ? cur : g.start, g.end).length;
+    const need = Math.max(0, target - act);
+    const perMonth = remainMonths ? need / remainMonths : need;
+    const ahead = act - shouldNow;
+    let badge;
+    if(act >= target) badge = '<span class="badge ok">已達成 🎉</span>';
+    else if(cur > g.end) badge = '<span class="badge no">已過截止月</span>';
+    else if(ahead >= 0) badge = '<span class="badge ok">進度超前</span>';
+    else badge = `<span class="badge no">落後 ${fmt(-ahead)}</span>`;
+    const plannedTotal = goalCum(g, g.end, 'plan');
+    return `<div class="goal">
+      <div class="top"><div><span class="nm">${esc(g.name)}</span>　<span class="rng">${short(g.start)} → ${short(g.end)}</span></div>${badge}</div>
+      <div class="bar"><div class="fill" style="width:${pct}%;background:${ahead>=0||act>=target?'var(--green)':'var(--seal-soft)'}"></div>${cur<=g.end && act<target ? `<div class="mark" style="left:${mpct}%"></div>` : ''}</div>
+      <div class="stats">
+        <div>已存<b>${fmt(act)}</b></div>
+        <div>目標<b>${fmt(target)}</b></div>
+        <div>完成度<b>${target?Math.round(act/target*100):0}%</b></div>
+        <div>到本月應存（計畫）<b>${fmt(shouldNow)}</b></div>
+        <div>剩 ${remainMonths} 個月，每月需存<b>${fmt(perMonth)}</b></div>
+        <div>所有月份計畫加總<b class="${plannedTotal>=target?'pos':'neg'}">${fmt(plannedTotal)}</b></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ================= 月份規劃 ================= */
+$('#m-prev').addEventListener('click', ()=>{ viewMonth = addM(viewMonth,-1); renderMonth(); });
+$('#m-next').addEventListener('click', ()=>{ viewMonth = addM(viewMonth,1); renderMonth(); });
+$('#m-today').addEventListener('click', ()=>{ viewMonth = ymNow(); renderMonth(); });
+$('#m-pick').addEventListener('change', e => { if(e.target.value){ viewMonth = e.target.value; renderMonth(); } });
+
+function renderMonth(){
+  const k = viewMonth, m = S.months[k];
+  $('#m-pick').value = k;
+  const st = status(k);
+  $('#m-status').innerHTML = `<span class="badge ${st.cls}">${st.text}</span>`;
+  const body = $('#m-body');
+
+  if(!m){
+    const prev = prevPlannedKey(k);
+    body.innerHTML = `<div class="empty">
+      <div style="font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);">${label(k)} 還沒有規劃</div>
+      <div style="margin-top:6px;">從固定收支範本開始，或沿用最近一個月（${prev ? short(prev) : '無'}）的計畫。</div>
+      <div class="acts">
+        <button class="btn" id="mk-tpl">用固定範本建立</button>
+        ${prev ? `<button class="btn dark" id="mk-prev">沿用 ${short(prev)} 的計畫</button>` : ''}
+        <button class="btn ghost" id="mk-blank">建立空白月份</button>
+      </div></div>`;
+    $('#mk-tpl').onclick = ()=>{ makeMonth(k, S.template); save(); renderMonth(); toast('已建立 ' + label(k)); };
+    if(prev) $('#mk-prev').onclick = ()=>{ makeMonth(k, S.months[prev].items, S.months[prev].goals); save(); renderMonth(); toast('已建立 ' + label(k)); };
+    $('#mk-blank').onclick = ()=>{ makeMonth(k, []); save(); renderMonth(); };
+    return;
+  }
+
+  const goals = activeGoals(k);
+  const row = (i) => `<div class="irow" data-id="${i.id}">
+      <div class="nmc"><span class="dot ${i.type==='income'?'in':'out'}"></span><input class="inp f-name" value="${esc(i.name)}"></div>
+      <input class="inp num f-plan" type="number" inputmode="decimal" value="${i.plan}">
+      <input class="inp num actual f-act" type="number" inputmode="decimal" placeholder="未填" value="${i.actual==null?'':i.actual}">
+      <div class="diff" data-diff></div>
+      <button class="x f-del" title="刪除">✕</button>
+    </div>`;
+  const inc = m.items.filter(i=>i.type==='income'), exp = m.items.filter(i=>i.type==='expense');
+
+  body.innerHTML = `
+    <div class="section-title">收支：計畫 vs 實際 <small>實際欄空白＝還沒填</small></div>
+    <div class="grid-head"><span>項目</span><span>計畫</span><span>實際</span><span>差額</span><span></span></div>
+    <div class="group-lbl">收入</div>
+    <div id="rows-in">${inc.map(row).join('') || '<div class="hint" style="padding:6px 2px;">尚無收入項目</div>'}</div>
+    <div class="group-lbl">支出</div>
+    <div id="rows-out">${exp.map(row).join('') || '<div class="hint" style="padding:6px 2px;">尚無支出項目</div>'}</div>
+    <div class="addrow">
+      <select class="inp" id="add-type"><option value="expense">支出</option><option value="income">收入</option></select>
+      <input class="inp" id="add-name" placeholder="新增項目（例如：旅遊、紅包）">
+      <input class="inp num" id="add-plan" type="number" placeholder="計畫金額">
+      <button class="btn" id="add-btn">新增</button>
+    </div>
+
+    <div class="section-title">目標存入 <small>這個月要放進長期目標的錢</small></div>
+    ${goals.length ? `<div class="grid-head"><span>目標</span><span>計畫</span><span>實際</span><span>差額</span><span></span></div>` +
+      goals.map(g=>{ const e = m.goals[g.id] || {plan:0, actual:null}; return `<div class="irow" data-goal="${g.id}">
+        <div class="nmc"><span class="dot gl"></span><span>${esc(g.name)}</span></div>
+        <input class="inp num g-plan" type="number" inputmode="decimal" value="${e.plan}">
+        <input class="inp num actual g-act" type="number" inputmode="decimal" placeholder="未填" value="${e.actual==null?'':e.actual}">
+        <div class="diff" data-diff></div><span></span></div>`; }).join('')
+      : '<div class="hint">這個月沒有進行中的長期目標。</div>'}
+
+    <div class="section-title">本月結算</div>
+    <div id="m-sum"></div>
+
+    <div class="section-title">每月檢討</div>
+    <textarea class="inp" id="m-note" rows="4" placeholder="這個月哪裡超支？下個月要調整什麼？">${esc(m.note)}</textarea>
+
+    <div class="section-title">往後規劃</div>
+    <div class="tools">
+      把這個月的計畫套用到之後
+      <input class="inp num" id="cp-n" type="number" min="1" max="24" value="3"> 個月
+      <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);"><input type="checkbox" id="cp-over"> 覆蓋已規劃的月份（已填的實際數字會清空）</label>
+      <button class="btn dark sm" id="cp-btn">套用</button>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" id="del-month">刪除這個月</button>
+    </div>`;
+
+  // 事件：項目
+  body.querySelectorAll('.irow[data-id]').forEach(el=>{
+    const it = m.items.find(i=>i.id===el.dataset.id);
+    el.querySelector('.f-name').addEventListener('change', e=>{ it.name = e.target.value.trim() || it.name; save(); });
+    el.querySelector('.f-plan').addEventListener('change', e=>{ it.plan = num(e.target.value) ?? 0; save(); updateMonthCalc(); });
+    el.querySelector('.f-act').addEventListener('change', e=>{ it.actual = num(e.target.value); save(); updateMonthCalc(); });
+    el.querySelector('.f-del').addEventListener('click', ()=>{ if(!confirm(`刪除「${it.name}」？`)) return; m.items = m.items.filter(x=>x!==it); save(); renderMonth(); });
+  });
+  body.querySelectorAll('.irow[data-goal]').forEach(el=>{
+    const gid = el.dataset.goal;
+    const get = () => (m.goals[gid] = m.goals[gid] || {plan:0, actual:null});
+    el.querySelector('.g-plan').addEventListener('change', e=>{ get().plan = num(e.target.value) ?? 0; save(); updateMonthCalc(); });
+    el.querySelector('.g-act').addEventListener('change', e=>{ get().actual = num(e.target.value); save(); updateMonthCalc(); });
+  });
+  $('#add-btn').addEventListener('click', ()=>{
+    const name = $('#add-name').value.trim(); if(!name) { $('#add-name').focus(); return; }
+    m.items.push({id:uid(), type:$('#add-type').value, name, plan:num($('#add-plan').value) ?? 0, actual:null});
+    save(); renderMonth();
+  });
+  $('#add-name').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#add-btn').click(); });
+  $('#m-note').addEventListener('change', e=>{ m.note = e.target.value; save(); toast('已儲存檢討'); });
+  $('#cp-btn').addEventListener('click', ()=>{
+    const n = Math.max(1, Math.min(24, parseInt($('#cp-n').value)||1));
+    const over = $('#cp-over').checked;
+    let made = 0, skip = 0;
+    for(let i=1;i<=n;i++){
+      const t = addM(k, i);
+      if(S.months[t] && !over){ skip++; continue; }
+      if(S.months[t] && over && !confirm(`${label(t)} 已有規劃，確定覆蓋？`)) { skip++; continue; }
+      const note = S.months[t]?.note || '';
+      makeMonth(t, m.items, m.goals).note = note; made++;
+    }
+    save(); renderMonth();
+    toast(`已建立 ${made} 個月` + (skip ? `，略過 ${skip} 個已規劃月份` : ''));
+  });
+  $('#del-month').addEventListener('click', ()=>{
+    if(!confirm(`確定刪除 ${label(k)} 的所有規劃與實際紀錄？`)) return;
+    delete S.months[k]; save(); renderMonth();
+  });
+  updateMonthCalc();
+}
+
+function diffHtml(type, plan, act){
+  if(act == null) return '<span style="color:var(--ink-soft)">—</span>';
+  const d = act - plan;
+  if(d === 0) return '<span class="pos">±0</span>';
+  const good = type === 'expense' ? d < 0 : d > 0;
+  return `<span class="${good?'pos':'neg'}">${fmtS(d)}</span>`;
+}
+function updateMonthCalc(){
+  const k = viewMonth, m = S.months[k]; if(!m) return;
+  document.querySelectorAll('#m-body .irow[data-id]').forEach(el=>{
+    const it = m.items.find(i=>i.id===el.dataset.id); if(!it) return;
+    el.querySelector('[data-diff]').innerHTML = diffHtml(it.type, Number(it.plan)||0, it.actual);
+  });
+  document.querySelectorAll('#m-body .irow[data-goal]').forEach(el=>{
+    const e = m.goals[el.dataset.goal] || {plan:0, actual:null};
+    el.querySelector('[data-diff]').innerHTML = diffHtml('income', Number(e.plan)||0, e.actual);
+  });
+  const s = summarize(k), st = status(k);
+  $('#m-status').innerHTML = `<span class="badge ${st.cls}">${st.text}</span>`;
+  const left = s.complete ? '' : `<p class="hint" style="margin:10px 0 0;">還有 ${(s.total - s.filled) + (s.goalTotal - s.goalFilled)} 項未填實際數字，全部填完才會判定「達成／未達成」。</p>`;
+  const v = (ok, yes, no) => s.complete ? `<span class="badge ${ok?'ok':'no'}">${ok?yes:no}</span>` : '<span class="badge na">待填完</span>';
+  $('#m-sum').innerHTML = `
+    <div class="summary">
+      <div class="sc"><div class="k">收入（實際 / 計畫）</div><div class="v pos">${fmt(s.actIn)}</div><div class="p">計畫 ${fmt(s.planIn)}</div></div>
+      <div class="sc"><div class="k">支出（實際 / 計畫）</div><div class="v neg">${fmt(s.actOut)}</div><div class="p">計畫 ${fmt(s.planOut)}</div></div>
+      <div class="sc"><div class="k">結餘（實際 / 計畫）</div><div class="v ${s.actBal>=0?'':'neg'}">${fmt(s.actBal)}</div><div class="p">計畫 ${fmt(s.planBal)}　扣掉目標存入後可自由運用 ${fmt(s.planBal - s.goalPlan)}</div></div>
+    </div>
+    <div class="verdict">
+      <div class="vc">結餘 ≥ 計畫結餘 <span class="num" style="color:var(--ink-soft)">${fmt(s.actBal)} / ${fmt(s.planBal)}</span>${v(s.balOk,'達成','未達成')}</div>
+      <div class="vc">支出 ≤ 計畫支出 <span class="num" style="color:var(--ink-soft)">${fmt(s.actOut)} / ${fmt(s.planOut)}</span>${v(s.outOk,'守住','超支')}</div>
+      ${s.goalTotal ? `<div class="vc">目標存入 ≥ 計畫 <span class="num" style="color:var(--ink-soft)">${fmt(s.goalAct)} / ${fmt(s.goalPlan)}</span>${v(s.goalOk,'達成','未達成')}</div>` : ''}
+    </div>${left}`;
+}
+
+/* ================= 範本與目標 ================= */
+function renderSettings(){
+  $('#tpl-list').innerHTML = S.template.map(t=>`<div class="trow" data-id="${t.id}">
+      <select class="inp t-type"><option value="expense" ${t.type==='expense'?'selected':''}>支出</option><option value="income" ${t.type==='income'?'selected':''}>收入</option></select>
+      <input class="inp t-name" value="${esc(t.name)}">
+      <input class="inp num t-amt" type="number" value="${t.amount}">
+      <button class="x t-del" title="刪除">✕</button></div>`).join('') || '<div class="hint">範本是空的</div>';
+  const tplTotal = () => S.template.reduce((s,t)=> s + (t.type==='income'?1:-1)*(Number(t.amount)||0), 0);
+  $('#tpl-total').textContent = fmt(tplTotal());
+  $('#tpl-list').querySelectorAll('.trow').forEach(el=>{
+    const t = S.template.find(x=>x.id===el.dataset.id);
+    el.querySelector('.t-type').addEventListener('change', e=>{ t.type=e.target.value; save(); $('#tpl-total').textContent = fmt(tplTotal()); });
+    el.querySelector('.t-name').addEventListener('change', e=>{ t.name=e.target.value.trim()||t.name; save(); });
+    el.querySelector('.t-amt').addEventListener('change', e=>{ t.amount=num(e.target.value)??0; save(); $('#tpl-total').textContent = fmt(tplTotal()); });
+    el.querySelector('.t-del').addEventListener('click', ()=>{ S.template = S.template.filter(x=>x!==t); save(); renderSettings(); });
+  });
+
+  $('#goal-edit').innerHTML = S.goals.map(g=>`<div class="grow" data-id="${g.id}">
+      <input class="inp g-name" value="${esc(g.name)}" placeholder="名稱">
+      <input class="inp num g-target" type="number" value="${g.target}" placeholder="目標金額">
+      <input class="inp g-start" type="month" value="${g.start}">
+      <input class="inp g-end" type="month" value="${g.end}">
+      <input class="inp num g-saved" type="number" value="${g.saved||0}" placeholder="起始已存">
+      <button class="x g-del" title="刪除">✕</button></div>`).join('') || '<div class="hint">尚無目標</div>';
+  $('#goal-edit').querySelectorAll('.grow[data-id]').forEach(el=>{
+    const g = S.goals.find(x=>x.id===el.dataset.id);
+    const bind = (sel, key, conv) => el.querySelector(sel).addEventListener('change', e=>{ const v = conv(e.target.value); if(v!=null && v!=='') g[key]=v; save(); });
+    bind('.g-name','name', v=>v.trim()); bind('.g-target','target', v=>num(v)); bind('.g-saved','saved', v=>num(v) ?? 0);
+    bind('.g-start','start', v=>v); bind('.g-end','end', v=>v);
+    el.querySelector('.g-del').addEventListener('click', ()=>{
+      if(!confirm(`刪除目標「${g.name}」？各月份裡的存入紀錄也會一起移除。`)) return;
+      S.goals = S.goals.filter(x=>x!==g);
+      Object.values(S.months).forEach(m=>{ delete m.goals[g.id]; });
+      save(); renderSettings();
+    });
+  });
+  renderSyncInfo();
+  renderBackups();
+}
+$('#tpl-add').addEventListener('click', ()=>{
+  const name = $('#tpl-name').value.trim(); if(!name) return;
+  S.template.push({id:uid(), type:$('#tpl-type').value, name, amount:num($('#tpl-amt').value) ?? 0});
+  $('#tpl-name').value=''; $('#tpl-amt').value=''; save(); renderSettings();
+});
+$('#goal-add').addEventListener('click', ()=>{
+  const cur = ymNow();
+  S.goals.push({id:uid(), name:'新目標', target:100000, start:cur, end:addM(cur,11), saved:0});
+  save(); renderSettings();
+});
+function renderSyncInfo(){
+  const el = $('#sync-info'); if(!el) return;
+  const last = S.updatedAt ? new Date(S.updatedAt).toLocaleString('zh-TW') : '—';
+  const desc = {
+    cloud:'✅ 已連上 Cloudflare KV，所有裝置看到的是同一份資料。',
+    local:'⚠️ 找不到雲端 API（/api/state），目前只存在這台裝置的瀏覽器。部署時記得要用 wrangler 一起部署 functions 資料夾。',
+    auth:'🔒 雲端需要密碼，按「輸入／更換密碼」。',
+    err:'⚠️ 雲端連線失敗，資料先存在本機，下次修改時會再試一次。',
+    init:'載入中…'
+  }[mode];
+  el.innerHTML = `${desc}<br>最後修改：<code>${last}</code>　月份數：<code>${Object.keys(S.months).length}</code>`;
+}
+async function apiGet(qs){
+  const r = await fetch('/api/state' + qs, {cache:'no-store', headers:{'X-Passcode': lsGet(LS_PASS) || ''}});
+  if(!r.ok) throw new Error('http_' + r.status);
+  return r.json();
+}
+async function renderBackups(){
+  const el = $('#bk-list'); if(!el) return;
+  if(mode !== 'cloud'){ el.innerHTML = '<div class="hint">連上雲端後可查看</div>'; return; }
+  el.innerHTML = '<div class="hint">載入中…</div>';
+  try{
+    const {days} = await apiGet('?backups=1');
+    if(!days.length){ el.innerHTML = '<div class="hint">還沒有備份（第一次存檔後就會產生）</div>'; return; }
+    el.innerHTML = `<p class="hint">共 ${days.length} 份。每份是「那天第一次修改之前」的完整資料。</p>` + days.map(d => `
+      <div class="trow" style="grid-template-columns:minmax(0,1fr) auto auto;">
+        <span class="num">${d}</span>
+        <button class="btn ghost sm" data-dl="${d}">下載</button>
+        <button class="btn ghost sm" data-rs="${d}">還原成這天</button>
+      </div>`).join('');
+    el.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', async ()=>{
+      const data = await apiGet('?backup=' + b.dataset.dl);
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `finance-backup-${b.dataset.dl}.json`; a.click();
+    }));
+    el.querySelectorAll('[data-rs]').forEach(b => b.addEventListener('click', async ()=>{
+      if(!confirm(`把所有資料還原成 ${b.dataset.rs} 的版本？\n（目前的資料今天已經有備份，之後還能再還原回來）`)) return;
+      const data = normalize(await apiGet('?backup=' + b.dataset.rs));
+      if(!data){ alert('備份格式不符'); return; }
+      S = data; save(); renderAll(); toast('已還原 ' + b.dataset.rs);
+    }));
+  }catch(e){ el.innerHTML = `<div class="hint">讀取備份失敗：${esc(e.message)}</div>`; }
+}
+$('#btn-pass').addEventListener('click', openPass);
+$('#btn-sync').addEventListener('click', async ()=>{ await load(); toast(mode==='cloud' ? '已同步' : '無法連到雲端'); });
+$('#btn-export').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `finance-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+});
+$('#btn-import').addEventListener('change', async e=>{
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const data = normalize(JSON.parse(await f.text()));
+    if(!data) throw new Error('格式不符');
+    if(!confirm('匯入會取代目前所有資料，確定？')) return;
+    S = data; save(); renderAll(); toast('匯入完成');
+  }catch(err){ alert('匯入失敗：' + err.message); }
+  e.target.value = '';
+});
+
+function renderAll(){
+  const active = document.querySelector('.view.active').id;
+  if(active === 'v-progress') renderProgress();
+  if(active === 'v-month') renderMonth();
+  if(active === 'v-settings') renderSettings();
+}
+
+load();
+})();
+</script>
+</body>
+</html>
