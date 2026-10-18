@@ -138,7 +138,7 @@
 
   /* settings */
   .trow{display:grid;grid-template-columns:90px minmax(0,1fr) 110px 26px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);}
-  .grow{display:grid;grid-template-columns:minmax(0,1.3fr) 110px 120px 120px 100px 26px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);}
+  .grow{display:grid;grid-template-columns:minmax(0,1.2fr) 96px 88px 118px 118px 88px 26px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);}
   .ghead{font-size:11px;color:var(--ink-soft);border-bottom:1px solid var(--line-soft);padding-bottom:4px;}
   .kv{font-size:13px;line-height:1.9;}
   .kv code{font-family:var(--mono);font-size:12px;background:rgba(107,99,85,0.1);padding:1px 5px;border-radius:3px;}
@@ -235,10 +235,10 @@
       <p class="hint" style="margin-top:8px;">範本月結餘：<b class="num" id="tpl-total"></b>。修改範本不會改到已經建立的月份。</p>
 
       <div class="section-title">長期目標 <small>例如結婚基金、頭期款、緊急預備金</small></div>
-      <div class="grow ghead"><span>名稱</span><span>目標金額</span><span>開始月</span><span>截止月</span><span>起始已存</span><span></span></div>
+      <div class="grow ghead"><span>名稱</span><span>目標金額</span><span>每月存入</span><span>開始月</span><span>截止月</span><span>起始已存</span><span></span></div>
       <div id="goal-edit"></div>
       <div style="margin-top:10px;"><button class="btn dark sm" id="goal-add">＋ 新增目標</button></div>
-      <p class="hint" style="margin-top:8px;">建立新月份時，每個目標的預設「計畫存入」＝ 尚差金額 ÷ 剩餘月數，之後可在月份頁自己改。</p>
+      <p class="hint" style="margin-top:8px;">「每月存入」有填就照這個金額；留空則自動算（尚差金額 ÷ 剩餘月數）。修改目標設定時，還沒填實際的月份會自動跟著更新；已填實際的月份不會動。</p>
 
       <div class="section-title">同步與備份</div>
       <div class="kv" id="sync-info"></div>
@@ -310,9 +310,10 @@ function defaultState(){
       {id:uid(), type:'expense', name:'Google 雲端', amount:65},
     ],
     goals: [
-      {id:uid(), name:'結婚基金', target:112500, start:'2026-09', end:'2026-12', saved:0},
+      {id:uid(), name:'結婚基金', target:112500, monthly:12500, start:'2026-09', end:'2027-05', saved:0},
     ],
     months: {},
+    migrations: {wedding12500: true},
   };
   return s;
 }
@@ -333,6 +334,7 @@ function goalCum(g, uptoKey, field){ // 累計（含 uptoKey）
 }
 function defaultGoalPlan(g, k){
   if(!goalActiveIn(g,k)) return 0;
+  if(Number(g.monthly) > 0) return Number(g.monthly);   // 有設「每月固定存入」就用它
   // 尚差金額（扣掉 k 之前已規劃/已存的）÷ 剩餘月數
   let before = Number(g.saved)||0;
   Object.keys(S.months).forEach(mk=>{
@@ -342,6 +344,30 @@ function defaultGoalPlan(g, k){
   });
   const left = span(k, g.end).length;
   return Math.max(0, Math.round((Number(g.target) - before) / Math.max(1,left)));
+}
+// 目標設定改變後：把「尚未填實際」的月份，計畫存入同步成新的預設值
+function syncGoalPlans(g){
+  Object.keys(S.months).sort().forEach(k=>{
+    const m = S.months[k], e = m.goals[g.id];
+    if(e && e.actual != null) return;               // 已填實際的月份不動
+    if(goalActiveIn(g,k)) m.goals[g.id] = {plan: defaultGoalPlan(g,k), actual:null};
+    else if(e) delete m.goals[g.id];
+  });
+}
+// 一次性調整（會記在資料裡，只跑一次）
+function runMigrations(){
+  S.migrations = S.migrations || {};
+  let changed = false;
+  if(!S.migrations.wedding12500){
+    const g = S.goals.find(x => x.name === '結婚基金');
+    if(g){
+      g.monthly = 12500; g.start = '2026-09';
+      g.end = addM(g.start, Math.ceil((Number(g.target)||0) / 12500) - 1);   // 112,500 → 2027-05
+      syncGoalPlans(g);
+    }
+    S.migrations.wedding12500 = true; changed = true;
+  }
+  if(changed) save();
 }
 function activeGoals(k){
   const m = S.months[k];
@@ -462,6 +488,7 @@ async function load(){
     else if(e.noApi){ setMode('local'); }
     else { setMode('err', e.message); }
   }
+  if(mode === 'cloud' || mode === 'local') runMigrations();
   ensureCurrentMonth();
   renderAll();
 }
@@ -601,8 +628,11 @@ function renderGoals(){
   $('#goal-list').innerHTML = S.goals.map(g=>{
     const target = Number(g.target)||0;
     const act = goalCum(g, null, 'actual');
-    const lastClosed = cur > g.end ? g.end : addM(cur, -1);
-    const shouldNow = goalCum(g, cur > g.end ? g.end : cur, 'plan');      // 到本月為止「計畫」應存
+    const lastClosed = cur > g.end ? g.end : addM(cur, -1);          // 到上個月底為止
+    const monthly = Number(g.monthly) || 0;
+    const shouldNow = lastClosed < g.start ? (Number(g.saved)||0)
+      : monthly > 0 ? (Number(g.saved)||0) + monthly * span(g.start, lastClosed).length
+      : goalCum(g, lastClosed, 'plan');                                  // 到上個月底「計畫」應存
     const pct = target ? Math.min(100, act/target*100) : 0;
     const mpct = target ? Math.min(100, shouldNow/target*100) : 0;
     const remainMonths = span(cur > g.start ? cur : g.start, g.end).length;
@@ -614,17 +644,17 @@ function renderGoals(){
     else if(cur > g.end) badge = '<span class="badge no">已過截止月</span>';
     else if(ahead >= 0) badge = '<span class="badge ok">進度超前</span>';
     else badge = `<span class="badge no">落後 ${fmt(-ahead)}</span>`;
-    const plannedTotal = goalCum(g, g.end, 'plan');
+    const plannedTotal = monthly > 0 ? (Number(g.saved)||0) + monthly * span(g.start, g.end).length : goalCum(g, g.end, 'plan');
     return `<div class="goal">
-      <div class="top"><div><span class="nm">${esc(g.name)}</span>　<span class="rng">${short(g.start)} → ${short(g.end)}</span></div>${badge}</div>
+      <div class="top"><div><span class="nm">${esc(g.name)}</span>　<span class="rng">${short(g.start)} → ${short(g.end)}${monthly ? `　每月 ${fmt(monthly)}` : ''}</span></div>${badge}</div>
       <div class="bar"><div class="fill" style="width:${pct}%;background:${ahead>=0||act>=target?'var(--green)':'var(--seal-soft)'}"></div>${cur<=g.end && act<target ? `<div class="mark" style="left:${mpct}%"></div>` : ''}</div>
       <div class="stats">
         <div>已存<b>${fmt(act)}</b></div>
         <div>目標<b>${fmt(target)}</b></div>
         <div>完成度<b>${target?Math.round(act/target*100):0}%</b></div>
-        <div>到本月應存（計畫）<b>${fmt(shouldNow)}</b></div>
+        <div>到上月底應存（計畫）<b>${fmt(shouldNow)}</b></div>
         <div>剩 ${remainMonths} 個月，每月需存<b>${fmt(perMonth)}</b></div>
-        <div>所有月份計畫加總<b class="${plannedTotal>=target?'pos':'neg'}">${fmt(plannedTotal)}</b></div>
+        <div>${monthly ? '照每月計畫可存到' : '所有月份計畫加總'}<b class="${plannedTotal>=target?'pos':'neg'}">${fmt(plannedTotal)}</b></div>
       </div>
     </div>`;
   }).join('');
@@ -804,13 +834,15 @@ function renderSettings(){
   $('#goal-edit').innerHTML = S.goals.map(g=>`<div class="grow" data-id="${g.id}">
       <input class="inp g-name" value="${esc(g.name)}" placeholder="名稱">
       <input class="inp num g-target" type="number" value="${g.target}" placeholder="目標金額">
+      <input class="inp num g-monthly" type="number" value="${g.monthly||''}" placeholder="自動">
       <input class="inp g-start" type="month" value="${g.start}">
       <input class="inp g-end" type="month" value="${g.end}">
       <input class="inp num g-saved" type="number" value="${g.saved||0}" placeholder="起始已存">
       <button class="x g-del" title="刪除">✕</button></div>`).join('') || '<div class="hint">尚無目標</div>';
   $('#goal-edit').querySelectorAll('.grow[data-id]').forEach(el=>{
     const g = S.goals.find(x=>x.id===el.dataset.id);
-    const bind = (sel, key, conv) => el.querySelector(sel).addEventListener('change', e=>{ const v = conv(e.target.value); if(v!=null && v!=='') g[key]=v; save(); });
+    const bind = (sel, key, conv) => el.querySelector(sel).addEventListener('change', e=>{ const v = conv(e.target.value); if(v!=null && v!=='') g[key]=v; syncGoalPlans(g); save(); });
+    el.querySelector('.g-monthly').addEventListener('change', e=>{ g.monthly = num(e.target.value) || 0; syncGoalPlans(g); save(); toast('已更新各月份的計畫存入'); });
     bind('.g-name','name', v=>v.trim()); bind('.g-target','target', v=>num(v)); bind('.g-saved','saved', v=>num(v) ?? 0);
     bind('.g-start','start', v=>v); bind('.g-end','end', v=>v);
     el.querySelector('.g-del').addEventListener('click', ()=>{
